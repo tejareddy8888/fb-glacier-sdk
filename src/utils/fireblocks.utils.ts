@@ -1,9 +1,7 @@
 import {
   Fireblocks,
   FireblocksResponse,
-  SignedMessageSignature,
   TransactionOperation,
-  TransactionRequest,
   TransactionResponse,
   TransactionStateEnum,
   TransferPeerPathType,
@@ -11,6 +9,7 @@ import {
 import crypto from "crypto";
 import { encodeCIP8Message } from "./general";
 import { termsAndConditionsHash } from "../constants";
+import { SupportedAssetIds, SupportedBlockchains } from "../types";
 
 export const generateTransactionPayload = (
   chain: SupportedBlockchains,
@@ -150,7 +149,7 @@ export const generateTransactionPayload = (
   } catch (error) {}
 };
 
-const getTxStatus = async (
+export const getTxStatus = async (
   txId: string,
   fireblocks: Fireblocks
 ): Promise<TransactionResponse> => {
@@ -185,40 +184,5 @@ const getTxStatus = async (
     return tx;
   } catch (error) {
     throw error;
-  }
-};
-
-export const rawSignRawMessage = async (
-  fireblocksSDK: Fireblocks,
-  transactionPayload: TransactionRequest
-): Promise<{
-  signature: SignedMessageSignature;
-  publicKey?: string;
-  content?: string;
-} | null> => {
-  try {
-    const transactionResponse =
-      await fireblocksSDK.transactions.createTransaction({
-        transactionRequest: transactionPayload,
-      });
-
-    const txId = transactionResponse.data.id;
-    if (!txId) throw new Error("Transaction ID is undefined.");
-
-    const completedTx = await getTxStatus(txId, fireblocksSDK);
-    const signatureData = completedTx.signedMessages?.[0];
-    if (signatureData?.signature) {
-      return {
-        signature: signatureData.signature,
-        publicKey: signatureData.publicKey,
-        content: signatureData.content,
-      };
-    } else {
-      console.warn("No signed message found in response.");
-      return null;
-    }
-  } catch (err: any) {
-    console.error(`${transactionPayload.assetId} signing error:`, err.message);
-    throw err;
   }
 };

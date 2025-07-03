@@ -1,4 +1,6 @@
-enum SupportedBlockchains {
+import { TransactionOperation, TransferPeerPathType } from "@fireblocks/ts-sdk";
+
+export enum SupportedBlockchains {
   CARDANO = "cardano",
   BITCOIN = "bitcoin",
   ETHEREUM = "ethereum",
@@ -8,7 +10,7 @@ enum SupportedBlockchains {
   XRP = "xrp",
 }
 
-enum SupportedAssetIds {
+export enum SupportedAssetIds {
   ADA = "ADA",
   BTC = "BTC",
   ETH = "ETH",

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { midnightClainAdress } from "../constants";
+import { SupportedBlockchains } from "../types";
 
 export class ClaimApiService {
   constructor() {}

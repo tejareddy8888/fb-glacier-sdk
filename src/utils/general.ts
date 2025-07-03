@@ -1,5 +1,6 @@
 import { Fireblocks } from "@fireblocks/ts-sdk";
 import * as cbor from "cbor";
+import { SupportedAssetIds, SupportedBlockchains } from "../types";
 
 export const encodeCIP8Message = (message: string): Buffer => {
   const protectedHeaders = cbor.encode(new Map([[1, -8]])); // { alg: EdDSA }

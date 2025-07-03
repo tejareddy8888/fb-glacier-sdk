@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { midnightProvtreeAdress } from "../constants";
+import { SupportedBlockchains } from "../types";
 export class ProvetreeService {
   public checkAddress = async (
     address: string,

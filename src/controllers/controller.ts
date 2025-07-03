@@ -5,7 +5,7 @@ import { Request, Response } from "express";
 import { ClaimApiService } from "../services/claim.api.service";
 import { ProvetreeService } from "../services/provetree.service";
 import { FireblocksService } from "../services/fireblocks.service";
-// import { generateMessage } from "../utils/generateMessage";
+import { SupportedBlockchains } from "../types";
 dotenv.config();
 
 export class ApiController {
@@ -36,7 +36,12 @@ export class ApiController {
         chain as SupportedBlockchains
       );
       res.status(200).json(value);
-    } catch (error) {}
+    } catch (error) {
+      console.error("Error in checkAddress:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : error,
+      });
+    }
   };
 
   public makeClaim = async (req: Request, res: Response) => {
@@ -61,7 +66,9 @@ export class ApiController {
         !fbResoponse.signature.fullSig ||
         !fbResoponse.publicKey
       ) {
-        throw new Error("...");
+        throw new Error(
+          "Invalid Fireblocks response: missing signature or public key"
+        );
       }
 
       const claimResponse = await this.claimApiService.makeClaim(
@@ -72,6 +79,11 @@ export class ApiController {
         fbResoponse.publicKey
       );
       res.status(200).json(claimResponse);
-    } catch (error) {}
+    } catch (error) {
+      console.error("Error in makeClaim:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : error,
+      });
+    }
   };
 }
