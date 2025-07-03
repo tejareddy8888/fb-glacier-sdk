@@ -1,9 +1,9 @@
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
-import { PORT } from './utils/config.js';
-import { Express } from 'express-serve-static-core';
-import router from './router';
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { PORT } from "./utils/config.js";
+import { Express } from "express-serve-static-core";
+import router from "./router";
 
 const startServer = () => {
   const app = express();
@@ -21,11 +21,9 @@ const startServer = () => {
 const configureMiddlewares = (app: Express) => {
   app.use(
     cors({
-      origin: [
-        'http://localhost:3000',
-      ],
+      origin: ["http://localhost:3000"],
       credentials: true,
-      exposedHeaders: ['Authorization'],
+      exposedHeaders: ["Authorization"],
     })
   );
   app.use(bodyParser.json());
