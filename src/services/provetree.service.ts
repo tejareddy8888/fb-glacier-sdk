@@ -48,8 +48,8 @@ export class ProvetreeService {
       } else {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
-    } catch (error) {
-      console.error("Error fetching proof data:", error);
+    } catch (error: any) {
+      console.error("Error fetching proof data:", error.message);
       throw error;
     }
   };
