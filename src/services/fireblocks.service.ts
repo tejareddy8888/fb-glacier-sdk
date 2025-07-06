@@ -8,8 +8,8 @@ import {
   generateTransactionPayload,
   getTxStatus,
 } from "../utils/fireblocks.utils";
-import { getVaultAccountAddress } from "../utils/general";
 import { SupportedAssetIds, SupportedBlockchains } from "../types";
+import { getVaultAccountAddress } from "../utils/general";
 
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
@@ -50,12 +50,12 @@ export class FireblocksService {
         console.warn("No signed message found in response.");
         return null;
       }
-    } catch (err: any) {
+    } catch (error: any) {
       console.error(
         `${transactionPayload.assetId} signing error:`,
-        err.message
+        error.message
       );
-      throw err;
+      throw error;
     }
   };
 
@@ -71,31 +71,43 @@ export class FireblocksService {
     content?: string;
   } | null> => {
     try {
-      const originAddress = await getVaultAccountAddress(
+      const transactionPayload = await generateTransactionPayload(
         this.fireblocksSDK,
-        originVaultAccountId,
-        assetId
-      );
-      const destinationAddress = await getVaultAccountAddress(
-        this.fireblocksSDK,
-        destinationVaultAccountId,
-        assetId
-      );
-      const transactionPayload = generateTransactionPayload(
         chain,
         assetId,
-        originAddress,
-        destinationAddress,
+        originVaultAccountId,
+        destinationVaultAccountId,
         amount
       );
       if (!transactionPayload) {
         throw new Error("Failed to generate transaction payload");
       }
+
       const response = await this.broadcastTransaction(transactionPayload);
       return response;
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error(error.message);
       return null;
+    }
+  };
+
+  public getVaultAccountAddress = async (
+    vaultAccountId: string,
+    assetId: string
+  ): Promise<string> => {
+    try {
+      const address = await getVaultAccountAddress(
+        this.fireblocksSDK,
+        vaultAccountId,
+        assetId
+      );
+      if (!address) {
+        throw new Error("Failed to generate transaction payload");
+      }
+
+      return address;
+    } catch (error: any) {
+      throw new Error(`${error.message}`);
     }
   };
 }
