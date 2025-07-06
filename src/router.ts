@@ -13,6 +13,6 @@ router
   .get("/provetree/check/:chain/:address", apiController.checkAddress)
   .get("/claim/check/:chain/:address", apiController.checkAddress);
 
-router.post("/claim/claims/:chain/:address", apiController.makeClaim);
+router.post("/claim/claims/:chain", apiController.makeClaim);
 
 export default router;
