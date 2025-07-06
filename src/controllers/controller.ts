@@ -13,9 +13,9 @@ export class ApiController {
   private claimApiService: ClaimApiService;
   private provetreeService: ProvetreeService;
   constructor() {
-    const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH;
+    const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
 
-    const secretKey = readFileSync(secretKeyPath || "", "utf-8");
+    const secretKey = readFileSync(secretKeyPath, "utf-8");
 
     const fireblocksConfig = {
       apiKey: process.env.FIREBLOCKS_API_KEY || "",
@@ -36,8 +36,8 @@ export class ApiController {
         chain as SupportedBlockchains
       );
       res.status(200).json(value);
-    } catch (error) {
-      console.error("Error in checkAddress:", error);
+    } catch (error: any) {
+      console.error("Error in checkAddress:", error.message);
       res.status(500).json({
         error: error instanceof Error ? error.message : error,
       });
@@ -45,19 +45,15 @@ export class ApiController {
   };
 
   public makeClaim = async (req: Request, res: Response) => {
-    const {
-      chain,
-      assetId,
-      originVaultAccountId,
-      destinationVaultAccountId,
-      amount,
-    } = req.body;
+    const { chain } = req.params;
+    const { assetId, originVaultAccountId, destinationVaultAccountId, amount } =
+      req.body;
     try {
       const fbResoponse = await this.fireblocksService.signMessage(
-        chain,
+        chain as SupportedBlockchains,
         assetId,
-        originVaultAccountId,
-        destinationVaultAccountId,
+        String(originVaultAccountId),
+        String(destinationVaultAccountId),
         amount
       );
 
@@ -71,16 +67,32 @@ export class ApiController {
         );
       }
 
+      const signature = fbResoponse.signature.fullSig;
+      const publicKey = fbResoponse.publicKey;
+
+      const [originAddress, destinationAddress] = await Promise.all([
+        this.fireblocksService.getVaultAccountAddress(
+          originVaultAccountId,
+          assetId
+        ),
+        this.fireblocksService.getVaultAccountAddress(
+          destinationVaultAccountId,
+          assetId
+        ),
+      ]);
+
       const claimResponse = await this.claimApiService.makeClaim(
-        originVaultAccountId,
+        chain as SupportedBlockchains,
+        originAddress,
         amount,
-        fbResoponse.signature.fullSig,
-        destinationVaultAccountId,
-        fbResoponse.publicKey
+        signature,
+        destinationAddress,
+        publicKey
       );
+      
       res.status(200).json(claimResponse);
-    } catch (error) {
-      console.error("Error in makeClaim:", error);
+    } catch (error: any) {
+      console.error("Error in makeClaim:", error.message);
       res.status(500).json({
         error: error instanceof Error ? error.message : error,
       });
