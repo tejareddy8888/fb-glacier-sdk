@@ -7,41 +7,47 @@ import {
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
 import crypto from "crypto";
-import { encodeCIP8Message } from "./general";
+import { encodeCIP8Message, getVaultAccountAddress } from "./general";
 import { termsAndConditionsHash } from "../constants";
 import { SupportedAssetIds, SupportedBlockchains } from "../types";
 
-export const generateTransactionPayload = (
+export const generateTransactionPayload = async (
+  fireblocksSdk: Fireblocks,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
-  originAddress: string,
-  destinationAddress: string,
+  originVaultAccountId: string,
+  destinationVaultAccountId: string,
   amount: number
 ) => {
-  const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
-
   try {
+    const destinationAddress = await getVaultAccountAddress(
+      fireblocksSdk,
+      destinationVaultAccountId,
+      assetId
+    );
+    const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
+
     switch (chain) {
       case SupportedBlockchains.CARDANO:
-        const cip8Payload = encodeCIP8Message(payload);
+        const cip8Payload = encodeCIP8Message("payload");
         const messageForSigning = cip8Payload.toString("binary");
         const adaHexMessage = Buffer.from(messageForSigning, "utf8").toString(
           "hex"
         );
 
         return {
-          operation: TransactionOperation.Raw,
-          assetId: assetId,
+          note: "ada Raw Signing Transaction with Fireblocks",
+          assetId: "ADA",
           source: {
             type: TransferPeerPathType.VaultAccount,
-            id: originAddress,
+            id: originVaultAccountId,
           },
-          destinationAddress: destinationAddress,
+          operation: TransactionOperation.Raw,
           extraParameters: {
             rawMessageData: {
               messages: [
                 {
-                  content: adaHexMessage,
+                  content: Buffer.from(adaHexMessage).toString("hex"),
                   type: "RAW",
                 },
               ],
@@ -55,9 +61,8 @@ export const generateTransactionPayload = (
           assetId: assetId,
           source: {
             type: TransferPeerPathType.VaultAccount,
-            id: originAddress,
+            id: originVaultAccountId,
           },
-          destinationAddress: destinationAddress,
           extraParameters: {
             rawMessageData: {
               messages: [
@@ -77,9 +82,8 @@ export const generateTransactionPayload = (
           assetId: assetId,
           source: {
             type: TransferPeerPathType.VaultAccount,
-            id: originAddress,
+            id: originVaultAccountId,
           },
-          destinationAddress: destinationAddress,
           extraParameters: {
             rawMessageData: {
               messages: [
@@ -100,9 +104,8 @@ export const generateTransactionPayload = (
           source: {
             type: TransferPeerPathType.VaultAccount,
 
-            id: originAddress,
+            id: originVaultAccountId,
           },
-          destinationAddress: destinationAddress,
           extraParameters: {
             rawMessageData: {
               messages: [
@@ -125,9 +128,8 @@ export const generateTransactionPayload = (
           operation: TransactionOperation.Raw,
           source: {
             type: TransferPeerPathType.VaultAccount,
-            id: originAddress,
+            id: originVaultAccountId,
           },
-          destinationAddress: destinationAddress,
           extraParameters: {
             rawMessageData: {
               messages: [
@@ -146,7 +148,9 @@ export const generateTransactionPayload = (
       default:
         throw new Error("block chain is not supported.");
     }
-  } catch (error) {}
+  } catch (error: any) {
+    throw new Error(`${error.message}`);
+  }
 };
 
 export const getTxStatus = async (
