@@ -7,72 +7,54 @@ import { ProvetreeService } from "../services/provetree.service";
 import { FireblocksService } from "../services/fireblocks.service";
 import { SupportedBlockchains } from "../types";
 import { getAssetIdsByBlockchain } from "../utils/general";
+import { FireblocksMidnightSDK } from "../FireblocksMidnightSDK";
 
 dotenv.config();
 
 export class ApiController {
-  private fireblocksService: FireblocksService;
-  private claimApiService: ClaimApiService;
-  private provetreeService: ProvetreeService;
-  constructor() {
-    const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
+  private sdkCache = new Map<string, FireblocksMidnightSDK>();
 
-    const secretKey = readFileSync(secretKeyPath, "utf-8");
+  private getSdk = async (
+    vaultAccountId: string,
+    chain: SupportedBlockchains
+  ) => {
+    const key = `${vaultAccountId}-${chain}`;
+    if (this.sdkCache.has(key)) return this.sdkCache.get(key)!;
 
-    const fireblocksConfig = {
-      apiKey: process.env.FIREBLOCKS_API_KEY || "",
-      secretKey: secretKey,
-      basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
-    };
-
-    this.fireblocksService = new FireblocksService(fireblocksConfig);
-    this.claimApiService = new ClaimApiService();
-    this.provetreeService = new ProvetreeService();
-  }
+    const assetId = getAssetIdsByBlockchain(chain)[0];
+    const sdk = await FireblocksMidnightSDK.create(vaultAccountId, assetId);
+    this.sdkCache.set(key, sdk);
+    return sdk;
+  };
 
   public checkAddress = async (req: Request, res: Response) => {
     const { vaultAccountId, chain } = req.params;
     try {
-      const assetId = getAssetIdsByBlockchain(chain as SupportedBlockchains)[0];
-      console.log("checkAddress", assetId);
-      const address = await this.fireblocksService.getVaultAccountAddress(
+      const sdk = await this.getSdk(
         vaultAccountId,
-        assetId
-      );
-
-      const value = await this.provetreeService.checkAddress(
-        address,
         chain as SupportedBlockchains
       );
-      res.status(200).json(value);
+      const result = await sdk.checkAddress(chain as SupportedBlockchains);
+
+      res.status(200).json(result);
     } catch (error: any) {
       console.error("Error in checkAddress:", error.message);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : error,
-      });
+      res.status(500).json({ error: error.message });
     }
   };
 
   public getClaims = async (req: Request, res: Response) => {
-    const { chain, vaultAccountId } = req.params;
+    const { vaultAccountId, chain } = req.params;
     try {
-      const assetId = getAssetIdsByBlockchain(chain as SupportedBlockchains)[0];
-      const address = await this.fireblocksService.getVaultAccountAddress(
+      const sdk = await this.getSdk(
         vaultAccountId,
-        assetId
+        chain as SupportedBlockchains
       );
-
-      const claimResponse = await this.claimApiService.getClaims(
-        chain as SupportedBlockchains,
-        address
-      );
-
-      res.status(200).json(claimResponse.data);
+      const result = await sdk.getClaims(chain as SupportedBlockchains);
+      res.status(200).json(result);
     } catch (error: any) {
       console.error("Error in getClaims:", error.message);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : error,
-      });
+      res.status(500).json({ error: error.message });
     }
   };
 
@@ -80,66 +62,151 @@ export class ApiController {
     const { chain } = req.params;
     const { assetId, originVaultAccountId, destinationAddress } = req.body;
     try {
-      const originAddress = await this.fireblocksService.getVaultAccountAddress(
+      const sdk = await this.getSdk(
         originVaultAccountId,
-        assetId
-      );
-      const amount = await this.provetreeService.checkAddress(
-        originAddress,
         chain as SupportedBlockchains
       );
-
-      const fbResoponse = await this.fireblocksService.signMessage(
+      const result = await sdk.makeClaims(
         chain as SupportedBlockchains,
         assetId,
-        String(originVaultAccountId),
-        destinationAddress,
-        amount
+        destinationAddress
       );
-
-      if (
-        !fbResoponse ||
-        !fbResoponse.publicKey ||
-        !fbResoponse.algorithm ||
-        !fbResoponse.signature ||
-        !fbResoponse.signature.fullSig
-      ) {
-        throw new Error(
-          "Invalid Fireblocks response: missing signature or public key"
-        );
-      }
-
-      const message = fbResoponse.message;
-      const publicKey = fbResoponse.publicKey;
-      let signature: string = "";
-      if (fbResoponse.algorithm === SignedMessageAlgorithmEnum.EcdsaSecp256K1) {
-        const { r, s, v } = fbResoponse.signature;
-        if (!r || !s || v === undefined)
-          throw new Error("ecdsa signature error.");
-
-        const ethV = v + 27;
-
-        signature = r + s + ethV.toString(16).padStart(2, "0");
-      } else {
-        signature = fbResoponse.signature.fullSig;
-      }
-
-      const claimResponse = await this.claimApiService.makeClaims(
-        chain as SupportedBlockchains,
-        originAddress,
-        amount,
-        message,
-        signature,
-        destinationAddress,
-        publicKey
-      );
-
-      res.status(200).json(claimResponse.data);
+      res.status(200).json(result.data);
     } catch (error: any) {
       console.error("Error in makeClaims:", error.message);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : error,
-      });
+      res.status(500).json({ error: error.message });
     }
   };
+
+  // private fireblocksService: FireblocksService;
+  // private claimApiService: ClaimApiService;
+  // private provetreeService: ProvetreeService;
+  // constructor() {
+  //   const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
+
+  //   const secretKey = readFileSync(secretKeyPath, "utf-8");
+
+  //   const fireblocksConfig = {
+  //     apiKey: process.env.FIREBLOCKS_API_KEY || "",
+  //     secretKey: secretKey,
+  //     basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
+  //   };
+
+  //   this.fireblocksService = new FireblocksService(fireblocksConfig);
+  //   this.claimApiService = new ClaimApiService();
+  //   this.provetreeService = new ProvetreeService();
+  // }
+
+  // public checkAddress = async (req: Request, res: Response) => {
+  //   const { vaultAccountId, chain } = req.params;
+  //   try {
+  //     const assetId = getAssetIdsByBlockchain(chain as SupportedBlockchains)[0];
+  //     console.log("checkAddress", assetId);
+  //     const address = await this.fireblocksService.getVaultAccountAddress(
+  //       vaultAccountId,
+  //       assetId
+  //     );
+
+  //     const value = await this.provetreeService.checkAddress(
+  //       address,
+  //       chain as SupportedBlockchains
+  //     );
+  //     res.status(200).json(value);
+  //   } catch (error: any) {
+  //     console.error("Error in checkAddress:", error.message);
+  //     res.status(500).json({
+  //       error: error instanceof Error ? error.message : error,
+  //     });
+  //   }
+  // };
+
+  // public getClaims = async (req: Request, res: Response) => {
+  //   const { chain, vaultAccountId } = req.params;
+  //   try {
+  //     const assetId = getAssetIdsByBlockchain(chain as SupportedBlockchains)[0];
+  //     const address = await this.fireblocksService.getVaultAccountAddress(
+  //       vaultAccountId,
+  //       assetId
+  //     );
+
+  //     const claimResponse = await this.claimApiService.getClaims(
+  //       chain as SupportedBlockchains,
+  //       address
+  //     );
+
+  //     res.status(200).json(claimResponse.data);
+  //   } catch (error: any) {
+  //     console.error("Error in getClaims:", error.message);
+  //     res.status(500).json({
+  //       error: error instanceof Error ? error.message : error,
+  //     });
+  //   }
+  // };
+
+  // public makeClaims = async (req: Request, res: Response) => {
+  //   const { chain } = req.params;
+  //   const { assetId, originVaultAccountId, destinationAddress } = req.body;
+  //   try {
+  //     const originAddress = await this.fireblocksService.getVaultAccountAddress(
+  //       originVaultAccountId,
+  //       assetId
+  //     );
+  //     const amount = await this.provetreeService.checkAddress(
+  //       originAddress,
+  //       chain as SupportedBlockchains
+  //     );
+
+  //     const fbResoponse = await this.fireblocksService.signMessage(
+  //       chain as SupportedBlockchains,
+  //       assetId,
+  //       String(originVaultAccountId),
+  //       destinationAddress,
+  //       amount
+  //     );
+
+  //     if (
+  //       !fbResoponse ||
+  //       !fbResoponse.publicKey ||
+  //       !fbResoponse.algorithm ||
+  //       !fbResoponse.signature ||
+  //       !fbResoponse.signature.fullSig
+  //     ) {
+  //       throw new Error(
+  //         "Invalid Fireblocks response: missing signature or public key"
+  //       );
+  //     }
+
+  //     const message = fbResoponse.message;
+  //     const publicKey = fbResoponse.publicKey;
+  //     let signature: string = "";
+  //     if (fbResoponse.algorithm === SignedMessageAlgorithmEnum.EcdsaSecp256K1) {
+  //       const { r, s, v } = fbResoponse.signature;
+  //       if (!r || !s || v === undefined)
+  //         throw new Error("ecdsa signature error.");
+
+  //       const ethV = v + 27;
+
+  //       signature = r + s + ethV.toString(16).padStart(2, "0");
+  //     } else {
+  //       signature = fbResoponse.signature.fullSig;
+  //     }
+
+  //     const claimResponse = await this.claimApiService.makeClaims(
+  //       chain as SupportedBlockchains,
+  //       originAddress,
+  //       amount,
+  //       message,
+  //       signature,
+  //       destinationAddress,
+  //       publicKey
+  //     );
+
+  //     res.status(200).json(claimResponse.data);
+  //   } catch (error: any) {
+  //     console.error("Error in makeClaims:", error.message);
+  //     res.status(500).json({
+  //       error: error instanceof Error ? error.message : error,
+  //     });
+  //   }
+  // };
 }
