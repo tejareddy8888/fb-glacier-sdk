@@ -10,9 +10,9 @@ router
     console.log("alive");
     res.status(200).send("Alive");
   })
-  .get("/provetree/check/:chain/:address", apiController.checkAddress)
-  .get("/claim/check/:chain/:address", apiController.checkAddress);
+  .get("/provetree/check/:chain/:vaultAccountId", apiController.checkAddress)
+  .get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims);
 
-router.post("/claim/claims/:chain", apiController.makeClaim);
+router.post("/claim/claims/:chain", apiController.makeClaims);
 
 export default router;

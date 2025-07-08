@@ -3,13 +3,15 @@ import {
   Fireblocks,
   SignedMessageSignature,
   TransactionRequest,
+  SignedMessageAlgorithmEnum,
 } from "@fireblocks/ts-sdk";
 import {
   generateTransactionPayload,
   getTxStatus,
 } from "../utils/fireblocks.utils";
 import { SupportedAssetIds, SupportedBlockchains } from "../types";
-import { getVaultAccountAddress } from "../utils/general";
+import { getAssetPublicKey, getVaultAccountAddress } from "../utils/general";
+import { termsAndConditionsHash } from "../constants";
 
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
@@ -26,8 +28,9 @@ export class FireblocksService {
     transactionPayload: TransactionRequest
   ): Promise<{
     signature: SignedMessageSignature;
-    publicKey?: string;
     content?: string;
+    publicKey?: string;
+    algorithm?: SignedMessageAlgorithmEnum;
   } | null> => {
     try {
       const transactionResponse =
@@ -43,8 +46,9 @@ export class FireblocksService {
       if (signatureData?.signature) {
         return {
           signature: signatureData.signature,
-          publicKey: signatureData.publicKey,
           content: signatureData.content,
+          publicKey: signatureData.publicKey,
+          algorithm: signatureData.algorithm,
         };
       } else {
         console.warn("No signed message found in response.");
@@ -63,28 +67,29 @@ export class FireblocksService {
     chain: SupportedBlockchains,
     assetId: SupportedAssetIds,
     originVaultAccountId: string,
-    destinationVaultAccountId: string,
+    destinationAddress: string,
     amount: number
   ): Promise<{
-    signature: SignedMessageSignature;
+    signature?: SignedMessageSignature;
     publicKey?: string;
+    algorithm?: SignedMessageAlgorithmEnum;
     content?: string;
+    message: string;
   } | null> => {
     try {
+      const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
       const transactionPayload = await generateTransactionPayload(
-        this.fireblocksSDK,
+        payload,
         chain,
         assetId,
-        originVaultAccountId,
-        destinationVaultAccountId,
-        amount
+        originVaultAccountId
       );
       if (!transactionPayload) {
         throw new Error("Failed to generate transaction payload");
       }
 
       const response = await this.broadcastTransaction(transactionPayload);
-      return response;
+      return { ...response, message: payload };
     } catch (error: any) {
       console.error(error.message);
       return null;
@@ -93,7 +98,7 @@ export class FireblocksService {
 
   public getVaultAccountAddress = async (
     vaultAccountId: string,
-    assetId: string
+    assetId: SupportedAssetIds
   ): Promise<string> => {
     try {
       const address = await getVaultAccountAddress(
@@ -102,10 +107,30 @@ export class FireblocksService {
         assetId
       );
       if (!address) {
-        throw new Error("Failed to generate transaction payload");
+        throw new Error("Failed to fetch vault account address");
       }
 
       return address;
+    } catch (error: any) {
+      throw new Error(`${error.message}`);
+    }
+  };
+
+  public getAssetPublicKey = async (
+    vaultAccountId: string,
+    assetId: SupportedAssetIds
+  ): Promise<string> => {
+    try {
+      const publicKey = await getAssetPublicKey(
+        this.fireblocksSDK,
+        vaultAccountId,
+        assetId
+      );
+      if (!publicKey) {
+        throw new Error("Failed to fetch public key");
+      }
+
+      return publicKey;
     } catch (error: any) {
       throw new Error(`${error.message}`);
     }

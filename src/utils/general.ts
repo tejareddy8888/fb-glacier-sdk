@@ -1,6 +1,7 @@
 import { Fireblocks } from "@fireblocks/ts-sdk";
 import * as cbor from "cbor";
 import { SupportedAssetIds, SupportedBlockchains } from "../types";
+import { Address } from "@emurgo/cardano-serialization-lib-nodejs";
 
 export const encodeCIP8Message = (message: string): Buffer => {
   const protectedHeaders = cbor.encode(new Map([[1, -8]])); // { alg: EdDSA }
@@ -37,7 +38,7 @@ export const getAssetIdsByBlockchain = (
 export const getVaultAccountAddress = async (
   fireblocksSDK: Fireblocks,
   vaultAccountId: string,
-  assetId: string
+  assetId: SupportedAssetIds
 ): Promise<string> => {
   try {
     const addressesResponse =
@@ -53,18 +54,63 @@ export const getVaultAccountAddress = async (
       );
     }
 
-    const address = addresses[0].address;
-    if (!address) {
+    // if (assetId === "ADA") {
+    //   const enterpriseAddress = addresses.find(
+    //     (addr) => addr.
+    //   )?.enterpriseAddress;
+
+    //   if (!enterpriseAddress) {
+    //     throw new Error(
+    //       `No enterprise address found for vault account ${vaultAccountId} (Cardano)`
+    //     );
+    //   }
+
+    //   return enterpriseAddress;
+    // }
+
+    const defaultAddress = addresses[0].address;
+    if (!defaultAddress) {
       throw new Error(
         `Invalid address found for vault account ${vaultAccountId} and asset ${assetId}`
       );
     }
 
-    return address;
+    return defaultAddress;
   } catch (error: any) {
-    console.error("Error retrieving vault account address:", error);
+    // console.error("Error retrieving vault account address:", error.message);
     throw new Error(
       `Failed to get address for vault account ${vaultAccountId}: ${error.message}`
+    );
+  }
+};
+
+export const getAssetPublicKey = async (
+  fireblocksSDK: Fireblocks,
+  vaultAccountId: string,
+  assetId: SupportedAssetIds
+): Promise<string> => {
+  try {
+    console.log("vaultAccountId", vaultAccountId, "assetId", assetId);
+    const response = await fireblocksSDK.vaults.getPublicKeyInfoForAddress({
+      vaultAccountId,
+      assetId,
+      change: 0,
+      addressIndex: 0,
+    });
+
+    const publicKey = response.data.publicKey;
+    console.log("getAssetPublicKey - dp", response.data.derivationPath);
+    if (!publicKey) {
+      throw new Error(
+        `Error fetching public key for vault account ${vaultAccountId}`
+      );
+    }
+
+    return publicKey;
+  } catch (error: any) {
+    // console.error("Error retrieving vault account address:", error.message);
+    throw new Error(
+      `Failed to get public key for vault account ${vaultAccountId}: ${error.message}`
     );
   }
 };

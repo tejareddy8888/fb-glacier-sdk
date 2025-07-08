@@ -7,26 +7,17 @@ import {
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
 import crypto from "crypto";
-import { encodeCIP8Message, getVaultAccountAddress } from "./general";
+import { encodeCIP8Message } from "./general";
 import { termsAndConditionsHash } from "../constants";
 import { SupportedAssetIds, SupportedBlockchains } from "../types";
 
 export const generateTransactionPayload = async (
-  fireblocksSdk: Fireblocks,
+  payload: string,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
-  originVaultAccountId: string,
-  destinationVaultAccountId: string,
-  amount: number
+  originVaultAccountId: string
 ) => {
   try {
-    const destinationAddress = await getVaultAccountAddress(
-      fireblocksSdk,
-      destinationVaultAccountId,
-      assetId
-    );
-    const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
-
     switch (chain) {
       case SupportedBlockchains.CARDANO:
         const cip8Payload = encodeCIP8Message("payload");
@@ -75,7 +66,8 @@ export const generateTransactionPayload = async (
           },
         };
 
-      case SupportedBlockchains.ETHEREUM || SupportedBlockchains.EVM:
+      case SupportedBlockchains.ETHEREUM:
+      case SupportedBlockchains.EVM:
         const message = Buffer.from(payload).toString("hex");
         return {
           operation: TransactionOperation.TypedMessage,
