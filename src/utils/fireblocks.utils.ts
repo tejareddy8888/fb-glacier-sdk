@@ -6,29 +6,24 @@ import {
   TransactionStateEnum,
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
-import crypto from "crypto";
-import { encodeCIP8Message } from "./general";
-import { termsAndConditionsHash } from "../constants";
-import { SupportedAssetIds, SupportedBlockchains } from "../types";
+import { testCIP8 } from "./general.js";
+import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 
 export const generateTransactionPayload = async (
   payload: string,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
-  originVaultAccountId: string
+  originVaultAccountId: string,
+  originAddress: string
 ) => {
   try {
     switch (chain) {
       case SupportedBlockchains.CARDANO:
-        const cip8Payload = encodeCIP8Message("payload");
-        const messageForSigning = cip8Payload.toString("binary");
-        const adaHexMessage = Buffer.from(messageForSigning, "utf8").toString(
-          "hex"
-        );
+        // const cip8Payload = await buildCIP8Message(payload, originAddress);
 
+        const rawPayload = await testCIP8(payload, originAddress);
         return {
-          note: "ada Raw Signing Transaction with Fireblocks",
-          assetId: "ADA",
+          assetId,
           source: {
             type: TransferPeerPathType.VaultAccount,
             id: originVaultAccountId,
@@ -38,7 +33,7 @@ export const generateTransactionPayload = async (
             rawMessageData: {
               messages: [
                 {
-                  content: Buffer.from(adaHexMessage).toString("hex"),
+                  content: rawPayload,
                   type: "RAW",
                 },
               ],
@@ -68,6 +63,7 @@ export const generateTransactionPayload = async (
 
       case SupportedBlockchains.ETHEREUM:
       case SupportedBlockchains.EVM:
+      case SupportedBlockchains.AVALANCHE:
         const message = Buffer.from(payload).toString("hex");
         return {
           operation: TransactionOperation.TypedMessage,
@@ -104,30 +100,6 @@ export const generateTransactionPayload = async (
                 {
                   content: solHexMessage,
                   type: "RAW",
-                },
-              ],
-            },
-          },
-        };
-
-      case SupportedBlockchains.AVALANCHE:
-        const hashMessage = crypto
-          .createHash("sha256")
-          .update(payload, "utf8")
-          .digest("hex");
-        return {
-          assetId: assetId,
-          operation: TransactionOperation.Raw,
-          source: {
-            type: TransferPeerPathType.VaultAccount,
-            id: originVaultAccountId,
-          },
-          extraParameters: {
-            rawMessageData: {
-              messages: [
-                {
-                  content: hashMessage,
-                  bip44addressIndex: 0,
                 },
               ],
             },
