@@ -1,7 +1,8 @@
 import axios from "axios";
-import * as cbor from "cbor";
-import { midnightClaimAdress } from "../constants";
-import { SupportedBlockchains } from "../types";
+import cbor from "cbor";
+import { midnightClaimAdress } from "../constants.js";
+import { SupportedBlockchains } from "../types.js";
+import { testCIP8 } from "../utils/general.js";
 
 export class ClaimApiService {
   constructor() {}
@@ -70,58 +71,36 @@ export class ClaimApiService {
     try {
       let coseSign1Hex: string = "";
       let params: any = {};
-      // let coseKeyHex: string = "";
 
       switch (chain) {
         case SupportedBlockchains.CARDANO:
-          // Generate COSE key
-          // const coseKeyMap = new Map<number, any>([
-          //   [1, 1], // kty: OKP
-          //   [3, -8], // alg: EdDSA
-          //   [-1, 6], // crv: Ed25519
-          //   [-2, Buffer.from(publicKey, "hex")], // x-coordinate (pub key)
-          // ]);
+          const protectedHeader = cbor.encode({ alg: "EdDSA" });
 
-          // coseKeyHex = cbor.encode(coseKeyMap).toString("hex");
+          const adaMessage = await testCIP8(message, originAddress);
 
-          // Generate COSE_Sign1
-          const adaProtectedHeader = cbor.encode({ alg: "EdDSA" });
-          const adaPayload = Buffer.from(message, "utf8");
-          const adaSignature = Buffer.from(fullSig, "hex");
-          const coseSign1Structure = [
-            adaProtectedHeader,
-            {},
-            adaPayload,
-            adaSignature,
-          ];
-          const adaCoseSign1 = cbor.encode(coseSign1Structure);
-          coseSign1Hex = adaCoseSign1.toString("hex");
+          const coseSign1 = cbor.encode([
+            protectedHeader, // protected headers
+            {}, // unprotected headers
+            Buffer.from(adaMessage, "hex"), // payload (from Lucid, already hex)
+            Buffer.from(fullSig, "hex"), // signature from Fireblocks
+          ]);
+
+          coseSign1Hex = coseSign1.toString("hex");
           params = [
             {
               address: originAddress,
               amount,
               cose_sign1: coseSign1Hex,
               dest_address: destinationAddress,
-              // cose_key: coseKeyHex,
               public_key: publicKey,
             },
           ];
           break;
-        case SupportedBlockchains.BITCOIN:
-          const btcSignatureBase64 = Buffer.from(fullSig, "hex").toString(
-            "base64"
-          );
-          params = [
-            {
-              address: originAddress,
-              amount,
-              dest_address: destinationAddress,
-              signature: btcSignatureBase64,
-            },
-          ];
-          break;
 
+        case SupportedBlockchains.BITCOIN:
         case SupportedBlockchains.ETHEREUM:
+        case SupportedBlockchains.SOLANA:
+        case SupportedBlockchains.AVALANCHE:
           params = [
             {
               address: originAddress,
@@ -156,6 +135,7 @@ export class ClaimApiService {
       } else {
         console.error("Unexpected error:", error);
       }
+      throw error;
     }
   };
 }
