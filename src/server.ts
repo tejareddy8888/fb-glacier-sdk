@@ -3,7 +3,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { PORT } from "./utils/config.js";
 import { Express } from "express-serve-static-core";
-import router from "./router";
+import router from "./router.js";
 
 const startServer = () => {
   const app = express();

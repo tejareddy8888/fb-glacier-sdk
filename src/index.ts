@@ -1,4 +1,4 @@
-import startServer from "./server";
+import startServer from "./server.js";
 (() => {
   try {
     console.log("server starting...");
