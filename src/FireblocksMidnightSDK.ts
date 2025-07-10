@@ -1,10 +1,10 @@
 import { readFileSync } from "fs";
 import { BasePath, SignedMessageAlgorithmEnum } from "@fireblocks/ts-sdk";
-import { FireblocksService } from "./services/fireblocks.service";
-import { ClaimApiService } from "./services/claim.api.service";
-import { ProvetreeService } from "./services/provetree.service";
-import { SupportedAssetIds, SupportedBlockchains } from "./types";
-import { getAssetIdsByBlockchain } from "./utils/general";
+import { FireblocksService } from "./services/fireblocks.service.js";
+import { ClaimApiService } from "./services/claim.api.service.js";
+import { ProvetreeService } from "./services/provetree.service.js";
+import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
+import { getAssetIdsByBlockchain } from "./utils/general.js";
 
 export class FireblocksMidnightSDK {
   private fireblocksService: FireblocksService;
@@ -131,10 +131,17 @@ export class FireblocksMidnightSDK {
         const { r, s, v } = fbResoponse.signature;
         if (!r || !s || v === undefined)
           throw new Error("ecdsa signature error.");
+        if (assetId === SupportedAssetIds.BTC) {
+          const encodedSig =
+            Buffer.from([Number.parseInt(String(v), 16) + 31]).toString("hex") +
+            fbResoponse.signature.fullSig;
 
-        const ethV = v + 27;
+          signature = Buffer.from(encodedSig, "hex").toString("base64");
+        } else {
+          const ethV = v + 27;
 
-        signature = r + s + ethV.toString(16).padStart(2, "0");
+          signature = r + s + ethV.toString(16).padStart(2, "0");
+        }
       } else {
         signature = fbResoponse.signature.fullSig;
       }
