@@ -8,10 +8,10 @@ import {
 import {
   generateTransactionPayload,
   getTxStatus,
-} from "../utils/fireblocks.utils";
-import { SupportedAssetIds, SupportedBlockchains } from "../types";
-import { getAssetPublicKey, getVaultAccountAddress } from "../utils/general";
-import { termsAndConditionsHash } from "../constants";
+} from "../utils/fireblocks.utils.js";
+import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
+import { getAssetPublicKey, getVaultAccountAddress } from "../utils/general.js";
+import { termsAndConditionsHash } from "../constants.js";
 
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
@@ -78,21 +78,29 @@ export class FireblocksService {
   } | null> => {
     try {
       const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
+      const originAddress = await this.getVaultAccountAddress(
+        originVaultAccountId,
+        assetId
+      );
       const transactionPayload = await generateTransactionPayload(
         payload,
         chain,
         assetId,
-        originVaultAccountId
+        originVaultAccountId,
+        originAddress
       );
       if (!transactionPayload) {
         throw new Error("Failed to generate transaction payload");
       }
 
       const response = await this.broadcastTransaction(transactionPayload);
-      return { ...response, message: payload };
+      return {
+        ...response,
+        message: payload,
+      };
     } catch (error: any) {
       console.error(error.message);
-      return null;
+      throw error;
     }
   };
 
