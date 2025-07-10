@@ -6,7 +6,7 @@ export enum SupportedBlockchains {
   ETHEREUM = "ethereum",
   EVM = "evm",
   SOLANA = "solana",
-  AVALANCHE = "avalanche",
+  AVALANCHE = "avax",
   XRP = "xrp",
 }
 
