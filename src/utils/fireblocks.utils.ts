@@ -1,13 +1,14 @@
 import {
   Fireblocks,
   FireblocksResponse,
+  SignedMessageAlgorithmEnum,
   TransactionOperation,
   TransactionResponse,
   TransactionStateEnum,
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
-import { testCIP8 } from "./general.js";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
+import { MSL } from "cardano-web3-js";
 
 export const generateTransactionPayload = async (
   payload: string,
@@ -19,22 +20,42 @@ export const generateTransactionPayload = async (
   try {
     switch (chain) {
       case SupportedBlockchains.CARDANO:
-        // const cip8Payload = await buildCIP8Message(payload, originAddress);
+        const payloadBytes = new TextEncoder().encode(payload);
 
-        const rawPayload = await testCIP8(payload, originAddress);
+        const protectedHeaders = MSL.HeaderMap.new();
+        protectedHeaders.set_algorithm_id(
+          MSL.Label.from_algorithm_id(MSL.AlgorithmId.EdDSA)
+        );
+        const protectedSerialized =
+          MSL.ProtectedHeaderMap.new(protectedHeaders);
+        const headers = MSL.Headers.new(
+          protectedSerialized,
+          MSL.HeaderMap.new()
+        );
+
+        const builder = MSL.COSESign1Builder.new(headers, payloadBytes, false);
+        const sigStructureBytes = builder.make_data_to_sign().to_bytes();
+        const content = Buffer.from(sigStructureBytes).toString("hex");
         return {
-          assetId,
           source: {
             type: TransferPeerPathType.VaultAccount,
-            id: originVaultAccountId,
           },
+
           operation: TransactionOperation.Raw,
           extraParameters: {
             rawMessageData: {
+              algorithm: SignedMessageAlgorithmEnum.EddsaEd25519,
               messages: [
                 {
-                  content: rawPayload,
+                  content,
                   type: "RAW",
+                  derivationPath: [
+                    44,
+                    1815,
+                    Number(originVaultAccountId),
+                    2,
+                    0,
+                  ],
                 },
               ],
             },

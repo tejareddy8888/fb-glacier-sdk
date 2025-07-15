@@ -1,10 +1,7 @@
-import dotenv from "dotenv";
 import { Request, Response } from "express";
 import { SupportedBlockchains } from "../types.js";
 import { getAssetIdsByBlockchain } from "../utils/general.js";
 import { FireblocksMidnightSDK } from "../FireblocksMidnightSDK.js";
-
-dotenv.config();
 
 export class ApiController {
   private sdkCache = new Map<string, FireblocksMidnightSDK>();
@@ -66,10 +63,15 @@ export class ApiController {
         assetId,
         destinationAddress
       );
-      res.status(200).json(claims.data);
+      res.status(200).json(claims);
     } catch (error: any) {
-      console.error("Error in makeClaims:", error.message);
-      res.status(500).json({ error: error.message });
+      console.error(
+        "Error in makeClaims:",
+        error instanceof Error ? error.message : error
+      );
+      res
+        .status(500)
+        .json({ error: error instanceof Error ? error.message : error });
     }
   };
 }

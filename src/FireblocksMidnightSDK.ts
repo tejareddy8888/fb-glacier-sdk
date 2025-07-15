@@ -1,33 +1,45 @@
+import dotenv from "dotenv";
 import { readFileSync } from "fs";
 import { BasePath, SignedMessageAlgorithmEnum } from "@fireblocks/ts-sdk";
+
 import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
+dotenv.config();
 
 export class FireblocksMidnightSDK {
   private fireblocksService: FireblocksService;
   private claimApiService: ClaimApiService;
   private provetreeService: ProvetreeService;
+  private assetId: SupportedAssetIds;
   private vaultAccountId: string;
   private address: string;
+  private blockfrostProjectId: string;
 
   constructor(
     fireblocksService: FireblocksService,
     claimApiService: ClaimApiService,
     provetreeService: ProvetreeService,
+    assetId: SupportedAssetIds,
     vaultAccountId: string,
-    address: string
+    address: string,
+    blockfrostProjectId: string
   ) {
     this.fireblocksService = fireblocksService;
     this.claimApiService = claimApiService;
     this.provetreeService = provetreeService;
+    this.assetId = assetId;
     this.vaultAccountId = vaultAccountId;
     this.address = address;
+    this.blockfrostProjectId = blockfrostProjectId;
   }
 
-  public static create = async (vaultAccountId: string, assetId: any) => {
+  public static create = async (
+    vaultAccountId: string,
+    assetId: SupportedAssetIds
+  ) => {
     const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
 
     const secretKey = readFileSync(secretKeyPath, "utf-8");
@@ -44,6 +56,8 @@ export class FireblocksMidnightSDK {
       assetId
     );
 
+    const blockfrostProjectId = process.env.BLOCKFROST_PROJECT_ID || "";
+
     const claimApiService = new ClaimApiService();
     const provetreeService = new ProvetreeService();
 
@@ -51,8 +65,10 @@ export class FireblocksMidnightSDK {
       fireblocksService,
       claimApiService,
       provetreeService,
+      assetId,
       vaultAccountId,
-      address
+      address,
+      blockfrostProjectId
     );
 
     return fireblocksMidnighSDK;

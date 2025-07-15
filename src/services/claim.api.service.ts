@@ -1,8 +1,20 @@
 import axios from "axios";
-import cbor from "cbor";
 import { midnightClaimAdress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
-import { testCIP8 } from "../utils/general.js";
+import { MSL } from "cardano-web3-js";
+
+const fromHex = (hex: string): Uint8Array => {
+  return new Uint8Array(Buffer.from(hex, "hex"));
+};
+
+function bech32ToKeyHash(bech32: string): string {
+  const addr = MSL.from_bech32(bech32);
+  const baseAddr = addr.as_base();
+  if (!baseAddr) throw new Error("Not a base address");
+
+  const keyHash = baseAddr.payment_cred().to_keyhash().to_bytes();
+  return Buffer.from(keyHash).toString("hex");
+}
 
 export class ClaimApiService {
   constructor() {}
@@ -74,18 +86,30 @@ export class ClaimApiService {
 
       switch (chain) {
         case SupportedBlockchains.CARDANO:
-          const protectedHeader = cbor.encode({ alg: "EdDSA" });
+          const protectedHeaders = MSL.HeaderMap.new();
+          protectedHeaders.set_algorithm_id(
+            MSL.Label.from_algorithm_id(MSL.AlgorithmId.EdDSA)
+          );
 
-          const adaMessage = await testCIP8(message, originAddress);
+          const protectedSerialized =
+            MSL.ProtectedHeaderMap.new(protectedHeaders);
+          const unprotectedHeaders = MSL.HeaderMap.new();
+          const headers = MSL.Headers.new(
+            protectedSerialized,
+            unprotectedHeaders
+          );
 
-          const coseSign1 = cbor.encode([
-            protectedHeader, // protected headers
-            {}, // unprotected headers
-            Buffer.from(adaMessage, "hex"), // payload (from Lucid, already hex)
-            Buffer.from(fullSig, "hex"), // signature from Fireblocks
-          ]);
+          const messageBytes = new Uint8Array(Buffer.from(message, "utf8"));
 
-          coseSign1Hex = coseSign1.toString("hex");
+          const builder = MSL.COSESign1Builder.new(
+            headers,
+            messageBytes,
+            false
+          );
+          const coseSign1 = builder.build(fromHex(fullSig));
+
+          coseSign1Hex = Buffer.from(coseSign1.to_bytes()).toString("hex");
+
           params = [
             {
               address: originAddress,
@@ -122,7 +146,7 @@ export class ClaimApiService {
         params
       );
 
-      console.log("midnight makeClame response", response);
+      console.log("midnight makeClame success");
 
       return response;
     } catch (error: any) {
