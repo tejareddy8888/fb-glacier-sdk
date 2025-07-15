@@ -5,13 +5,13 @@ import {
   TransactionRequest,
   SignedMessageAlgorithmEnum,
 } from "@fireblocks/ts-sdk";
+
 import {
   generateTransactionPayload,
   getTxStatus,
 } from "../utils/fireblocks.utils.js";
-import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
-import { getAssetPublicKey, getVaultAccountAddress } from "../utils/general.js";
 import { termsAndConditionsHash } from "../constants.js";
+import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
@@ -109,38 +109,62 @@ export class FireblocksService {
     assetId: SupportedAssetIds
   ): Promise<string> => {
     try {
-      const address = await getVaultAccountAddress(
-        this.fireblocksSDK,
-        vaultAccountId,
-        assetId
-      );
-      if (!address) {
-        throw new Error("Failed to fetch vault account address");
+      const addressesResponse =
+        await this.fireblocksSDK.vaults.getVaultAccountAssetAddressesPaginated({
+          vaultAccountId,
+          assetId,
+        });
+
+      const addresses = addressesResponse.data.addresses;
+      if (!addresses || addresses.length === 0) {
+        throw new Error(
+          `No addresses found for vault account ${vaultAccountId} and asset ${assetId}`
+        );
       }
 
-      return address;
+      const defaultAddress = addresses[0].address;
+      if (!defaultAddress) {
+        throw new Error(
+          `Invalid address found for vault account ${vaultAccountId} and asset ${assetId}`
+        );
+      }
+
+      return defaultAddress;
     } catch (error: any) {
-      throw new Error(`${error.message}`);
+      throw new Error(
+        `Failed to get address for vault account ${vaultAccountId}: ${error.message}`
+      );
     }
   };
 
   public getAssetPublicKey = async (
     vaultAccountId: string,
-    assetId: SupportedAssetIds
+    assetId: SupportedAssetIds,
+    change: number = 0,
+    addressIndex: number = 0
   ): Promise<string> => {
     try {
-      const publicKey = await getAssetPublicKey(
-        this.fireblocksSDK,
-        vaultAccountId,
-        assetId
-      );
+      const response =
+        await this.fireblocksSDK.vaults.getPublicKeyInfoForAddress({
+          vaultAccountId,
+          assetId,
+          change,
+          addressIndex,
+        });
+
+      const publicKey = response.data.publicKey;
+
       if (!publicKey) {
-        throw new Error("Failed to fetch public key");
+        throw new Error(
+          `Error fetching public key for vault account ${vaultAccountId}`
+        );
       }
 
       return publicKey;
     } catch (error: any) {
-      throw new Error(`${error.message}`);
+      throw new Error(
+        `Failed to get public key for vault account ${vaultAccountId}: ${error.message}`
+      );
     }
   };
 }
