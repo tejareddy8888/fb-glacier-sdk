@@ -1,23 +1,24 @@
 import { TransactionOperation, TransferPeerPathType } from "@fireblocks/ts-sdk";
 
 export enum SupportedBlockchains {
-  CARDANO = "cardano",
-  BITCOIN = "bitcoin",
-  ETHEREUM = "ethereum",
-  EVM = "evm",
-  SOLANA = "solana",
   AVALANCHE = "avax",
+  BAT = "bat",
+  BITCOIN = "bitcoin",
+  BNB = "bnb",
+  CARDANO = "cardano",
+  ETHEREUM = "ethereum",
+  SOLANA = "solana",
   XRP = "xrp",
 }
 
 export enum SupportedAssetIds {
   ADA = "ADA",
-  BTC = "BTC",
-  ETH = "ETH",
-  BNB = "BNB",
-  BAT = "BAT",
-  SOL = "SOL",
   AVAX = "AVAX",
+  BAT = "BAT",
+  BTC = "BTC",
+  BNB = "BNB",
+  ETH = "ETH",
+  SOL = "SOL",
   XRP = "XRP",
 }
 

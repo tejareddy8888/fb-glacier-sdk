@@ -83,7 +83,8 @@ export const generateTransactionPayload = async (
         };
 
       case SupportedBlockchains.ETHEREUM:
-      case SupportedBlockchains.EVM:
+      case SupportedBlockchains.BAT:
+      case SupportedBlockchains.BNB:
       case SupportedBlockchains.AVALANCHE:
         const message = Buffer.from(payload).toString("hex");
         return {

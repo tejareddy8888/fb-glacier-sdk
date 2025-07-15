@@ -123,6 +123,8 @@ export class ClaimApiService {
 
         case SupportedBlockchains.BITCOIN:
         case SupportedBlockchains.ETHEREUM:
+        case SupportedBlockchains.BAT:
+        case SupportedBlockchains.BNB:
         case SupportedBlockchains.SOLANA:
         case SupportedBlockchains.AVALANCHE:
           params = [
