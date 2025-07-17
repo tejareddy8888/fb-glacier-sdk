@@ -22,46 +22,17 @@ export enum SupportedAssetIds {
   XRP = "XRP",
 }
 
-enum TypedMessagesTypes {
-  EIP191 = "EIP191",
-  EIP712 = "EIP712",
-  BTC = "BTC_MESSAGE",
-}
-
-interface MessagePayloadSource {
-  type: TransferPeerPathType;
-  id: string;
-}
-
-interface TypedMessages {
-  content: any;
-  type: TypedMessagesTypes;
-}
-
-interface RawMessageData {
-  messages: TypedMessages[];
-}
-
-interface MessagePayloadSourceExtraParameters {
-  rawMessageData: RawMessageData;
-}
-
-interface MessagePayload {
-  operation?: TransactionOperation;
-  assetId: SupportedBlockchains;
-  source?: MessagePayloadSource;
-  note?: string;
-  vaultAccountId?: string;
-  bip44addressIndex?: number;
-  message?: string;
-  extraParameters?: MessagePayloadSourceExtraParameters;
-}
-
-interface RawSigningConfig {
-  assetId: string;
-  message: string;
-  vaultAccountId: string;
-  bip44addressIndex?: number;
-  note?: string;
-  extraParameters?: Record<string, any>;
+export interface Utxo {
+  address: string;
+  tx_hash: string;
+  tx_index: number;
+  output_index: number;
+  amount: {
+    unit: string;
+    quantity: string;
+  }[];
+  block: string;
+  data_hash: string | null;
+  inline_datum: string | null;
+  reference_script_hash: string | null;
 }

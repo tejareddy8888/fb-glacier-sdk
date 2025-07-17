@@ -13,7 +13,10 @@ export class ApiController {
     const key = `${vaultAccountId}-${chain}`;
     if (this.sdkCache.has(key)) return this.sdkCache.get(key)!;
 
-    const assetId = getAssetIdsByBlockchain(chain)[0];
+    const assetId = getAssetIdsByBlockchain(chain);
+    if (!assetId) {
+      throw new Error(`Unsupported blockchain: ${chain}`);
+    }
     const sdk = await FireblocksMidnightSDK.create(vaultAccountId, assetId);
     this.sdkCache.set(key, sdk);
     return sdk;
@@ -28,7 +31,7 @@ export class ApiController {
       );
       const result = await sdk.checkAddress(chain as SupportedBlockchains);
 
-      res.status(200).json(result);
+      res.status(200).json({ value: result });
     } catch (error: any) {
       console.error("Error in checkAddress:", error.message);
       res.status(500).json({ error: error.message });
@@ -67,6 +70,35 @@ export class ApiController {
     } catch (error: any) {
       console.error(
         "Error in makeClaims:",
+        error instanceof Error ? error.message : error
+      );
+      res
+        .status(500)
+        .json({ error: error instanceof Error ? error.message : error });
+    }
+  };
+
+  public transferClaims = async (req: Request, res: Response) => {
+    try {
+      const {
+        vaultAccountId,
+        recipientAddress,
+        tokenPolicyId,
+        requiredTokenAmount,
+      } = req.body;
+      const sdk = await this.getSdk(
+        String(vaultAccountId),
+        SupportedBlockchains.CARDANO
+      );
+      const claims = await sdk.transferClaims(
+        recipientAddress,
+        tokenPolicyId,
+        requiredTokenAmount,
+      );
+      res.status(200).json(claims);
+    } catch (error: any) {
+      console.error(
+        "Error in transferClaims:",
         error instanceof Error ? error.message : error
       );
       res

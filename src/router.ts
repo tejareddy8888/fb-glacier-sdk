@@ -13,6 +13,8 @@ router
   .get("/provetree/check/:chain/:vaultAccountId", apiController.checkAddress)
   .get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims);
 
-router.post("/claim/claims/:chain", apiController.makeClaims);
+router
+  .post("/claim/transfer", apiController.transferClaims)
+  .post("/claim/claims/:chain", apiController.makeClaims);
 
 export default router;

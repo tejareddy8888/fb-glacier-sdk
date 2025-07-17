@@ -6,7 +6,7 @@ import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
-import { getAssetIdsByBlockchain } from "./utils/general.js";
+import { tokenTransactionFee } from "./constants.js";
 dotenv.config();
 
 export class FireblocksMidnightSDK {
@@ -76,9 +76,6 @@ export class FireblocksMidnightSDK {
 
   public checkAddress = async (chain: SupportedBlockchains) => {
     try {
-      const assetId = getAssetIdsByBlockchain(chain as SupportedBlockchains)[0];
-      console.log("checkAddress", assetId);
-
       const value = await this.provetreeService.checkAddress(
         this.address,
         chain as SupportedBlockchains
@@ -176,6 +173,60 @@ export class FireblocksMidnightSDK {
     } catch (error: any) {
       throw new Error(
         `Error in makeClaims:
+        ${error instanceof Error ? error.message : error}`
+      );
+    }
+  };
+
+  public transferClaims = async (
+    recipientAddress: string,
+    tokenPolicyId: string,
+    requiredTokenAmount: number,
+    minRecipientLovelace = 1_000_000,
+    minChangeLovelace = 1_000_000
+  ) => {
+    try {
+      const transactionFee = tokenTransactionFee;
+      const utxoResult = await this.fireblocksService.fetchAndSelectUtxos(
+        this.address,
+        this.blockfrostProjectId,
+        tokenPolicyId,
+        requiredTokenAmount,
+        transactionFee,
+        minRecipientLovelace,
+        minChangeLovelace
+      );
+
+      if (!utxoResult) {
+        throw new Error("no utxo found");
+      }
+
+      const { selectedUtxos, accumulatedAda, accumulatedTokenAmount } =
+        utxoResult;
+      console.log("fetchAndSelectUtxos response", {
+        selectedUtxos,
+        accumulatedAda,
+        accumulatedTokenAmount,
+      });
+      const adaTarget = minRecipientLovelace + transactionFee;
+      if (
+        accumulatedTokenAmount < requiredTokenAmount ||
+        accumulatedAda < adaTarget
+      ) {
+        throw {
+          code: "INSUFFICIENT_BALANCE",
+          message: "Insufficient balance for token or ADA.",
+          details: {
+            requiredTokenAmount,
+            accumulatedTokenAmount,
+            requiredAda: adaTarget,
+            accumulatedAda,
+          },
+        };
+      }
+    } catch (error: any) {
+      throw new Error(
+        `Error in transferClaims:
         ${error instanceof Error ? error.message : error}`
       );
     }
