@@ -27,7 +27,7 @@ export class SdkManager {
   }
 
   /**
-   * Get an SDK instance for a specific vault account ID
+   * Get an SDK instance for a specific vault account ID and blockchain
    * @param vaultAccountId Fireblocks vault account ID
    * @param chain Supported blockchain
    * @returns FireblocksMidnightSDK instance
@@ -80,6 +80,7 @@ export class SdkManager {
   /**
    * Release an SDK instance back to the pool
    * @param vaultAccountId Vault account ID
+   * @param chain Supported blockchain
    */
   public releaseSdk = (vaultAccountId: string): void => {
     const poolItem = this.sdkPool.get(vaultAccountId);
@@ -92,6 +93,7 @@ export class SdkManager {
   /**
    * Create a new SDK instance
    * @param vaultAccountId Vault account ID
+   * @param chain Supported blockchain
    * @returns New FireblocksMidnightSDK instance
    */
   private async createSdkInstance(
