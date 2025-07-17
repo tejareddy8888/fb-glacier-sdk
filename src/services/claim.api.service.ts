@@ -1,7 +1,6 @@
 import axios from "axios";
 import { midnightClaimAdress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
-import { MSL } from "cardano-web3-js";
 
 export class ClaimApiService {
   constructor() {}
@@ -68,6 +67,7 @@ export class ClaimApiService {
     publicKey: string
   ): Promise<any> => {
     try {
+      const { MSL } = await import("cardano-web3-js");
       let coseSign1Hex: string = "";
       let params: any = {};
 

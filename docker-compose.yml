@@ -1,0 +1,14 @@
+services:
+  fireblocks-midnight-sdk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./secrets/fireblocks_secret.key:/secrets/fireblocks_secret.key:ro
+      - ./.env:/app/.env:ro
+    env_file: ./.env
+    environment:
+      - FIREBLOCKS_API_SECRET=/secrets/fireblocks_secret.key
+    restart: always

@@ -8,15 +8,15 @@ import {
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
-import { MSL } from "cardano-web3-js";
 
 export const generateTransactionPayload = async (
   payload: string,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
-  originVaultAccountId: string,
+  originVaultAccountId: string
 ) => {
   try {
+    const { MSL } = await import("cardano-web3-js");
     switch (chain) {
       case SupportedBlockchains.CARDANO:
         const payloadBytes = new TextEncoder().encode(payload);
