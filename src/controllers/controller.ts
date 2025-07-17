@@ -3,16 +3,16 @@ import { SupportedBlockchains } from "../types.js";
 import { SdkManager } from "../pool/sdkManager.js";
 
 export class ApiController {
-  constructor(private sdkManager: SdkManager = sdkManager) {}
+  private sdkManager: SdkManager;
 
-  private async getSdk(vaultAccountId: string, chain: SupportedBlockchains) {
-    return await this.sdkManager.getSdk(vaultAccountId, chain);
+  constructor() {
+    this.sdkManager = new SdkManager();
   }
 
   public checkAddress = async (req: Request, res: Response) => {
     const { vaultAccountId, chain } = req.params;
     try {
-      const sdk = await this.getSdk(
+      const sdk = await this.sdkManager.getSdk(
         vaultAccountId,
         chain as SupportedBlockchains
       );
@@ -28,7 +28,7 @@ export class ApiController {
   public getClaims = async (req: Request, res: Response) => {
     const { vaultAccountId, chain } = req.params;
     try {
-      const sdk = await this.getSdk(
+      const sdk = await this.sdkManager.getSdk(
         vaultAccountId,
         chain as SupportedBlockchains
       );
@@ -44,7 +44,7 @@ export class ApiController {
     const { chain } = req.params;
     const { originVaultAccountId, destinationAddress } = req.body;
     try {
-      const sdk = await this.getSdk(
+      const sdk = await this.sdkManager.getSdk(
         String(originVaultAccountId),
         chain as SupportedBlockchains
       );
@@ -72,7 +72,7 @@ export class ApiController {
         tokenPolicyId,
         requiredTokenAmount,
       } = req.body;
-      const sdk = await this.getSdk(
+      const sdk = await this.sdkManager.getSdk(
         String(vaultAccountId),
         SupportedBlockchains.CARDANO
       );
