@@ -1,13 +1,38 @@
 import dotenv from "dotenv";
 import { readFileSync } from "fs";
-import { BasePath, SignedMessageAlgorithmEnum } from "@fireblocks/ts-sdk";
+import {
+  BasePath,
+  SignedMessageAlgorithmEnum,
+  TransactionOperation,
+  TransferPeerPathType,
+  VaultWalletAddress,
+} from "@fireblocks/ts-sdk";
+import { blake2b } from "blakejs";
 
 import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
-import { tokenTransactionFee } from "./constants.js";
+import { nightTokenName, tokenTransactionFee } from "./constants.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
+import {
+  buildTransaction,
+  calculateTtl,
+  createTransactionInputs,
+  createTransactionOutputs,
+  fetchAndSelectUtxos,
+  submitTransaction,
+} from "./utils/cardanoUtils.js";
+import {
+  Address,
+  Ed25519Signature,
+  PublicKey,
+  Transaction,
+  TransactionWitnessSet,
+  Vkey,
+  Vkeywitness,
+  Vkeywitnesses,
+} from "@emurgo/cardano-serialization-lib-nodejs";
 dotenv.config();
 
 export class FireblocksMidnightSDK {
@@ -41,41 +66,49 @@ export class FireblocksMidnightSDK {
     vaultAccountId: string;
     chain: SupportedBlockchains;
   }): Promise<FireblocksMidnightSDK> => {
-    const { vaultAccountId, chain } = params;
-    const assetId = getAssetIdsByBlockchain(chain);
-    if (!assetId) {
-      throw new Error(`Unsupported blockchain: ${chain}`);
+    try {
+      const { vaultAccountId, chain } = params;
+      const assetId = getAssetIdsByBlockchain(chain);
+      if (!assetId) {
+        throw new Error(`Unsupported blockchain: ${chain}`);
+      }
+      const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
+
+      const secretKey = readFileSync(secretKeyPath, "utf-8");
+
+      const fireblocksConfig = {
+        apiKey: process.env.FIREBLOCKS_API_KEY || "",
+        secretKey: secretKey,
+        basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
+      };
+
+      const fireblocksService = new FireblocksService(fireblocksConfig);
+      const address = await fireblocksService.getVaultAccountAddress(
+        vaultAccountId,
+        assetId
+      );
+
+      const blockfrostProjectId = process.env.BLOCKFROST_PROJECT_ID || "";
+
+      const claimApiService = new ClaimApiService();
+      const provetreeService = new ProvetreeService();
+
+      return new FireblocksMidnightSDK({
+        fireblocksService,
+        claimApiService,
+        provetreeService,
+        assetId,
+        vaultAccountId,
+        address,
+        blockfrostProjectId,
+      });
+    } catch (error: any) {
+      throw new Error(
+        `Error creating FireblocksMidnightSDK: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
     }
-    const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
-
-    const secretKey = readFileSync(secretKeyPath, "utf-8");
-
-    const fireblocksConfig = {
-      apiKey: process.env.FIREBLOCKS_API_KEY || "",
-      secretKey: secretKey,
-      basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
-    };
-
-    const fireblocksService = new FireblocksService(fireblocksConfig);
-    const address = await fireblocksService.getVaultAccountAddress(
-      vaultAccountId,
-      assetId
-    );
-
-    const blockfrostProjectId = process.env.BLOCKFROST_PROJECT_ID || "";
-
-    const claimApiService = new ClaimApiService();
-    const provetreeService = new ProvetreeService();
-
-    return new FireblocksMidnightSDK({
-      fireblocksService,
-      claimApiService,
-      provetreeService,
-      assetId,
-      vaultAccountId,
-      address,
-      blockfrostProjectId,
-    });
   };
 
   public checkAddress = async (chain: SupportedBlockchains) => {
@@ -185,12 +218,16 @@ export class FireblocksMidnightSDK {
     recipientAddress: string,
     tokenPolicyId: string,
     requiredTokenAmount: number,
-    minRecipientLovelace = 1_000_000,
-    minChangeLovelace = 1_000_000
-  ) => {
+    minRecipientLovelace = 1_200_000,
+    minChangeLovelace = 1_200_000
+  ): Promise<{
+    txHash: string;
+    senderAddress: string;
+    tokenName: string;
+  }> => {
     try {
       const transactionFee = tokenTransactionFee;
-      const utxoResult = await this.fireblocksService.fetchAndSelectUtxos(
+      const utxoResult = await fetchAndSelectUtxos(
         this.address,
         this.blockfrostProjectId,
         tokenPolicyId,
@@ -204,13 +241,13 @@ export class FireblocksMidnightSDK {
         throw new Error("no utxo found");
       }
 
-      const { selectedUtxos, accumulatedAda, accumulatedTokenAmount } =
-        utxoResult;
-      console.log("fetchAndSelectUtxos response", {
+      const {
+        blockfrost,
         selectedUtxos,
         accumulatedAda,
         accumulatedTokenAmount,
-      });
+      } = utxoResult;
+   
       const adaTarget = minRecipientLovelace + transactionFee;
       if (
         accumulatedTokenAmount < requiredTokenAmount ||
@@ -227,9 +264,97 @@ export class FireblocksMidnightSDK {
           },
         };
       }
+
+      const txInputs = createTransactionInputs(selectedUtxos);
+      const recipientAddrObj = Address.from_bech32(recipientAddress);
+      const senderAddrObj = Address.from_bech32(this.address);
+
+      const txOutputs = createTransactionOutputs(
+        minRecipientLovelace,
+        transactionFee,
+        recipientAddrObj,
+        senderAddrObj,
+        tokenPolicyId,
+        nightTokenName,
+        requiredTokenAmount,
+        selectedUtxos
+      );
+      const ttl = await calculateTtl(blockfrost, 2600);
+      const txBody = buildTransaction({
+        txInputs,
+        txOutputs,
+        fee: transactionFee,
+        ttl,
+      });
+
+      const txBodyBytes = txBody.to_bytes();
+      const hashBytes = blake2b(txBodyBytes, undefined, 32);
+      const txHashHex = Buffer.from(hashBytes).toString("hex");
+      const transactionPayload = {
+        assetId: this.assetId,
+        operation: TransactionOperation.Raw,
+        source: {
+          type: TransferPeerPathType.VaultAccount,
+          id: this.vaultAccountId,
+        },
+        note: "transfer ADA native tokens",
+        extraParameters: {
+          rawMessageData: {
+            messages: [
+              {
+                content: txHashHex,
+                type: "RAW",
+              },
+            ],
+          },
+        },
+      };
+      const broadcastTransactionresponse =
+        await this.fireblocksService.broadcastTransaction(transactionPayload);
+      const publicKeyBytes = Uint8Array.from(
+        Buffer.from(broadcastTransactionresponse?.publicKey!, "hex")
+      );
+      const signatureBytes = Uint8Array.from(
+        Buffer.from(broadcastTransactionresponse?.signature?.fullSig!, "hex")
+      );
+      const cardanoPubKey = Vkey.new(PublicKey.from_bytes(publicKeyBytes));
+      const cardanoSig = Ed25519Signature.from_bytes(signatureBytes);
+
+      const witness = Vkeywitness.new(cardanoPubKey, cardanoSig);
+      const witnesses = Vkeywitnesses.new();
+      witnesses.add(witness);
+
+      const witnessSet = TransactionWitnessSet.new();
+      witnessSet.set_vkeys(witnesses);
+
+      const signedTransaction = Transaction.new(txBody, witnessSet);
+
+      const txHash = await submitTransaction(blockfrost, signedTransaction);
+      return {
+        txHash,
+        senderAddress: this.address,
+        tokenName: nightTokenName,
+      };
     } catch (error: any) {
       throw new Error(
         `Error in transferClaims:
+        ${error instanceof Error ? error.message : error}`
+      );
+    }
+  };
+
+  public getVaultAccountAddresses = async (
+    vaultAccountId: string
+  ): Promise<VaultWalletAddress[]> => {
+    try {
+      const addresses = await this.fireblocksService.getVaultAccountAddresses(
+        vaultAccountId,
+        this.assetId
+      );
+      return addresses;
+    } catch (error: any) {
+      throw new Error(
+        `Error in getVaultAccountAddresses:
         ${error instanceof Error ? error.message : error}`
       );
     }

@@ -3,6 +3,7 @@ import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 const blockchainToAssetIdsMap: Record<SupportedBlockchains, SupportedAssetIds> =
   {
     [SupportedBlockchains.CARDANO]: SupportedAssetIds.ADA,
+    [SupportedBlockchains.CARDANO_TESTNET]: SupportedAssetIds.ADA_TEST,
     [SupportedBlockchains.BITCOIN]: SupportedAssetIds.BTC,
     [SupportedBlockchains.ETHEREUM]: SupportedAssetIds.ETH,
     [SupportedBlockchains.BNB]: SupportedAssetIds.BNB,

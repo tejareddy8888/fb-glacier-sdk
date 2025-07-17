@@ -27,6 +27,7 @@ export enum SupportedBlockchains {
   BITCOIN = "bitcoin",
   BNB = "bnb",
   CARDANO = "cardano",
+  CARDANO_TESTNET = "cardano_testnet",
   ETHEREUM = "ethereum",
   SOLANA = "solana",
   XRP = "xrp",
@@ -34,6 +35,7 @@ export enum SupportedBlockchains {
 
 export enum SupportedAssetIds {
   ADA = "ADA",
+  ADA_TEST = "ADA_TEST",
   AVAX = "AVAX",
   BAT = "BAT",
   BTC = "BTC",

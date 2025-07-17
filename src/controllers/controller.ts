@@ -72,16 +72,27 @@ export class ApiController {
         tokenPolicyId,
         requiredTokenAmount,
       } = req.body;
+      console.log(
+        `Transferring claims from vault ${vaultAccountId} to ${recipientAddress} with policy ${tokenPolicyId} and amount ${requiredTokenAmount}`
+      );
       const sdk = await this.sdkManager.getSdk(
         String(vaultAccountId),
-        SupportedBlockchains.CARDANO
+        SupportedBlockchains.CARDANO_TESTNET
       );
-      const claims = await sdk.transferClaims(
+      const { txHash, senderAddress, tokenName } = await sdk.transferClaims(
         recipientAddress,
         tokenPolicyId,
-        requiredTokenAmount
+        Number(requiredTokenAmount)
       );
-      res.status(200).json(claims);
+      res.status(200).json({
+        status: "success",
+        transactionHash: txHash,
+        recipientAddress,
+        senderAddress: senderAddress,
+        tokenPolicyId,
+        tokenName,
+        amount: requiredTokenAmount,
+      });
     } catch (error: any) {
       console.error(
         "Error in transferClaims:",
@@ -90,6 +101,21 @@ export class ApiController {
       res
         .status(500)
         .json({ error: error instanceof Error ? error.message : error });
+    }
+  };
+
+  public getVaultAccountAddresses = async (req: Request, res: Response) => {
+    const { chain, vaultAccountId } = req.params;
+    try {
+      const sdk = await this.sdkManager.getSdk(
+        vaultAccountId,
+        chain as SupportedBlockchains
+      );
+      const addresses = await sdk.getVaultAccountAddresses(vaultAccountId);
+      res.status(200).json({ addresses: addresses });
+    } catch (error: any) {
+      console.error("Error in getVaultAccountAddresses:", error.message);
+      res.status(500).json({ error: error.message });
     }
   };
 }
