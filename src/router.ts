@@ -11,7 +11,11 @@ router
     res.status(200).send("Alive");
   })
   .get("/provetree/check/:chain/:vaultAccountId", apiController.checkAddress)
-  .get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims);
+  .get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims)
+  .get(
+    "/fireblocks/vaults/:chain/:vaultAccountId",
+    apiController.getVaultAccountAddresses
+  );
 
 router
   .post("/claim/transfer", apiController.transferClaims)

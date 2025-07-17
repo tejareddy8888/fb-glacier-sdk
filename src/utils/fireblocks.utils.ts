@@ -15,7 +15,6 @@ export const generateTransactionPayload = async (
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
   originVaultAccountId: string,
-  originAddress: string
 ) => {
   try {
     switch (chain) {

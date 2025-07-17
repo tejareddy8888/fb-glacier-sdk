@@ -4,21 +4,15 @@ import {
   SignedMessageSignature,
   TransactionRequest,
   SignedMessageAlgorithmEnum,
+  VaultWalletAddress,
 } from "@fireblocks/ts-sdk";
 
 import {
   generateTransactionPayload,
   getTxStatus,
 } from "../utils/fireblocks.utils.js";
-import { nightTokenName, termsAndConditionsHash } from "../constants.js";
-import { SupportedAssetIds, SupportedBlockchains, Utxo } from "../types.js";
-import { BlockFrostAPI } from "@blockfrost/blockfrost-js";
-import {
-  calculateTokenAmount,
-  fetchUtxos,
-  filterUtxos,
-  getLovelaceAmount,
-} from "../utils/cardanoUtils.js";
+import {  termsAndConditionsHash } from "../constants.js";
+import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
@@ -85,16 +79,12 @@ export class FireblocksService {
   } | null> => {
     try {
       const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
-      const originAddress = await this.getVaultAccountAddress(
-        originVaultAccountId,
-        assetId
-      );
+
       const transactionPayload = await generateTransactionPayload(
         payload,
         chain,
         assetId,
-        originVaultAccountId,
-        originAddress
+        originVaultAccountId
       );
       if (!transactionPayload) {
         throw new Error("Failed to generate transaction payload");
@@ -144,6 +134,30 @@ export class FireblocksService {
     }
   };
 
+  public getVaultAccountAddresses = async (
+    vaultAccountId: string,
+    assetId: SupportedAssetIds
+  ): Promise<VaultWalletAddress[]> => {
+    try {
+      const addressesResponse =
+        await this.fireblocksSDK.vaults.getVaultAccountAssetAddressesPaginated({
+          vaultAccountId,
+          assetId,
+        });
+
+      const addresses = addressesResponse.data.addresses;
+      if (!addresses) {
+        throw new Error(
+          `Failed to fetch addresses for vault account ${vaultAccountId} and asset ${assetId}`
+        );
+      }
+      return addresses;
+    } catch (error: any) {
+      throw new Error(
+        `Failed to get address for vault account ${vaultAccountId}: ${error.message}`
+      );
+    }
+  };
   public getAssetPublicKey = async (
     vaultAccountId: string,
     assetId: SupportedAssetIds,
@@ -173,74 +187,5 @@ export class FireblocksService {
         `Failed to get public key for vault account ${vaultAccountId}: ${error.message}`
       );
     }
-  };
-
-  public fetchAndSelectUtxos = async (
-    address: string,
-    blockfrostProjectId: string,
-    tokenPolicyId: string,
-    requiredTokenAmount: number,
-    transactionFee: number,
-    minRecipientLovelace = 1_000_000,
-    minChangeLovelace = 1_000_000
-  ) => {
-    try {
-      const blockfrost = new BlockFrostAPI({
-        projectId: blockfrostProjectId,
-      });
-      const utxos = await fetchUtxos(blockfrost, address);
-
-      const tokenUtxosWithAmounts = filterUtxos(utxos, tokenPolicyId)
-        .map((utxo) => ({
-          utxo,
-          tokenAmount: calculateTokenAmount(
-            utxo,
-            tokenPolicyId,
-            nightTokenName
-          ),
-          adaAmount: getLovelaceAmount(utxo),
-        }))
-        .sort((a, b) => b.tokenAmount - a.tokenAmount);
-      let selectedUtxos: Utxo[] = [];
-      let accumulatedTokenAmount = 0;
-      let accumulatedAda = 0;
-
-      // Accumulate token UTXOs
-      for (const { utxo, tokenAmount, adaAmount } of tokenUtxosWithAmounts) {
-        selectedUtxos.push(utxo);
-        accumulatedTokenAmount += tokenAmount;
-        accumulatedAda += adaAmount;
-
-        if (
-          accumulatedTokenAmount >= requiredTokenAmount &&
-          accumulatedAda >= minRecipientLovelace + transactionFee
-        ) {
-          break;
-        }
-      }
-      const adaTarget =
-        minRecipientLovelace + transactionFee + minChangeLovelace;
-      if (accumulatedAda < adaTarget) {
-        const remainingUtxos = utxos.filter((u) => !selectedUtxos.includes(u));
-        const adaUtxos = remainingUtxos
-          .map((utxo) => ({
-            utxo,
-            adaAmount: getLovelaceAmount(utxo),
-          }))
-          .sort((a, b) => b.adaAmount - a.adaAmount);
-
-        for (const { utxo, adaAmount } of adaUtxos) {
-          selectedUtxos.push(utxo);
-          accumulatedAda += adaAmount;
-          if (accumulatedAda >= adaTarget) break;
-        }
-      }
-
-      return {
-        selectedUtxos,
-        accumulatedAda,
-        accumulatedTokenAmount,
-      };
-    } catch (error) {}
   };
 }
