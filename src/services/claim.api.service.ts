@@ -3,19 +3,6 @@ import { midnightClaimAdress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
 import { MSL } from "cardano-web3-js";
 
-const fromHex = (hex: string): Uint8Array => {
-  return new Uint8Array(Buffer.from(hex, "hex"));
-};
-
-function bech32ToKeyHash(bech32: string): string {
-  const addr = MSL.from_bech32(bech32);
-  const baseAddr = addr.as_base();
-  if (!baseAddr) throw new Error("Not a base address");
-
-  const keyHash = baseAddr.payment_cred().to_keyhash().to_bytes();
-  return Buffer.from(keyHash).toString("hex");
-}
-
 export class ClaimApiService {
   constructor() {}
   public claimByAddress = async (
@@ -106,7 +93,8 @@ export class ClaimApiService {
             messageBytes,
             false
           );
-          const coseSign1 = builder.build(fromHex(fullSig));
+          const hexSig = new Uint8Array(Buffer.from(fullSig, "hex"));
+          const coseSign1 = builder.build(hexSig);
 
           coseSign1Hex = Buffer.from(coseSign1.to_bytes()).toString("hex");
 
