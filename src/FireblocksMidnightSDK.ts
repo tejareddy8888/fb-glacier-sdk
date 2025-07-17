@@ -7,6 +7,7 @@ import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
 import { tokenTransactionFee } from "./constants.js";
+import { getAssetIdsByBlockchain } from "./utils/general.js";
 dotenv.config();
 
 export class FireblocksMidnightSDK {
@@ -18,28 +19,33 @@ export class FireblocksMidnightSDK {
   private address: string;
   private blockfrostProjectId: string;
 
-  constructor(
-    fireblocksService: FireblocksService,
-    claimApiService: ClaimApiService,
-    provetreeService: ProvetreeService,
-    assetId: SupportedAssetIds,
-    vaultAccountId: string,
-    address: string,
-    blockfrostProjectId: string
-  ) {
-    this.fireblocksService = fireblocksService;
-    this.claimApiService = claimApiService;
-    this.provetreeService = provetreeService;
-    this.assetId = assetId;
-    this.vaultAccountId = vaultAccountId;
-    this.address = address;
-    this.blockfrostProjectId = blockfrostProjectId;
+  constructor(params: {
+    fireblocksService: FireblocksService;
+    claimApiService: ClaimApiService;
+    provetreeService: ProvetreeService;
+    assetId: SupportedAssetIds;
+    vaultAccountId: string;
+    address: string;
+    blockfrostProjectId: string;
+  }) {
+    this.fireblocksService = params.fireblocksService;
+    this.claimApiService = params.claimApiService;
+    this.provetreeService = params.provetreeService;
+    this.assetId = params.assetId;
+    this.vaultAccountId = params.vaultAccountId;
+    this.address = params.address;
+    this.blockfrostProjectId = params.blockfrostProjectId;
   }
 
-  public static create = async (
-    vaultAccountId: string,
-    assetId: SupportedAssetIds
-  ) => {
+  public static create = async (params: {
+    vaultAccountId: string;
+    chain: SupportedBlockchains;
+  }): Promise<FireblocksMidnightSDK> => {
+    const { vaultAccountId, chain } = params;
+    const assetId = getAssetIdsByBlockchain(chain);
+    if (!assetId) {
+      throw new Error(`Unsupported blockchain: ${chain}`);
+    }
     const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
 
     const secretKey = readFileSync(secretKeyPath, "utf-8");
@@ -61,17 +67,15 @@ export class FireblocksMidnightSDK {
     const claimApiService = new ClaimApiService();
     const provetreeService = new ProvetreeService();
 
-    const fireblocksMidnighSDK = new FireblocksMidnightSDK(
+    return new FireblocksMidnightSDK({
       fireblocksService,
       claimApiService,
       provetreeService,
       assetId,
       vaultAccountId,
       address,
-      blockfrostProjectId
-    );
-
-    return fireblocksMidnighSDK;
+      blockfrostProjectId,
+    });
   };
 
   public checkAddress = async (chain: SupportedBlockchains) => {
@@ -107,7 +111,6 @@ export class FireblocksMidnightSDK {
 
   public makeClaims = async (
     chain: SupportedBlockchains,
-    assetId: SupportedAssetIds,
     destinationAddress: string
   ) => {
     try {
@@ -119,7 +122,7 @@ export class FireblocksMidnightSDK {
 
       const fbResoponse = await this.fireblocksService.signMessage(
         chain as SupportedBlockchains,
-        assetId,
+        this.assetId,
         this.vaultAccountId,
         destinationAddress,
         amount
@@ -144,7 +147,7 @@ export class FireblocksMidnightSDK {
         const { r, s, v } = fbResoponse.signature;
         if (!r || !s || v === undefined)
           throw new Error("ecdsa signature error.");
-        if (assetId === SupportedAssetIds.BTC) {
+        if (this.assetId === SupportedAssetIds.BTC) {
           const encodedSig =
             Buffer.from([Number.parseInt(String(v), 16) + 31]).toString("hex") +
             fbResoponse.signature.fullSig;

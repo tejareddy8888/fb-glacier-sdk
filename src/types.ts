@@ -1,4 +1,25 @@
-import { TransactionOperation, TransferPeerPathType } from "@fireblocks/ts-sdk";
+import { FireblocksMidnightSDK } from "./FireblocksMidnightSDK";
+
+export interface SdkPoolItem {
+  sdk: FireblocksMidnightSDK;
+  lastUsed: Date;
+  isInUse: boolean;
+}
+
+export interface PoolConfig {
+  maxPoolSize: number;
+  idleTimeoutMs: number;
+  cleanupIntervalMs: number;
+  connectionTimeoutMs: number;
+  retryAttempts: number;
+}
+
+export interface SdkManagerMetrics {
+  totalInstances: number;
+  activeInstances: number;
+  idleInstances: number;
+  instancesByVaultAccount: Record<string, boolean>;
+}
 
 export enum SupportedBlockchains {
   AVALANCHE = "avax",
