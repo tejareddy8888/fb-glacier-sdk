@@ -1,13 +1,14 @@
 {
   "name": "sdk_node",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "build": "tsc",
     "build:w": "tsc -w",
-    "start": "nodemon ./dist/index.js",
+    "start": "nodemon ./dist/app.js",
     "dev": "concurrently  \"npm:build:w\" \"npm:start\"",
-    "lint": "eslint . --fix"
+    "lint": "eslint . --fix",
+    "docs": "typedoc src"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.9",
     "ts-node-dev": "^2.0.0",
+    "typedoc": "^0.28.7",
     "typescript": "^5.8.3"
   },
   "dependencies": {
