@@ -1,7 +1,4 @@
-import dotenv from "dotenv";
-import { readFileSync } from "fs";
 import {
-  BasePath,
   SignedMessageAlgorithmEnum,
   TransactionOperation,
   TransferPeerPathType,
@@ -22,7 +19,7 @@ import {
   createTransactionOutputs,
   fetchAndSelectUtxos,
   submitTransaction,
-} from "./utils/cardanoUtils.js";
+} from "./utils/cardano.utils.js";
 import {
   Address,
   Ed25519Signature,
@@ -33,7 +30,7 @@ import {
   Vkeywitness,
   Vkeywitnesses,
 } from "@emurgo/cardano-serialization-lib-nodejs";
-dotenv.config();
+import { config } from "./utils/config.js";
 
 export class FireblocksMidnightSDK {
   private fireblocksService: FireblocksService;
@@ -72,15 +69,8 @@ export class FireblocksMidnightSDK {
       if (!assetId) {
         throw new Error(`Unsupported blockchain: ${chain}`);
       }
-      const secretKeyPath = process.env.FIREBLOCKS_SECRET_KEY_PATH!;
 
-      const secretKey = readFileSync(secretKeyPath, "utf-8");
-
-      const fireblocksConfig = {
-        apiKey: process.env.FIREBLOCKS_API_KEY || "",
-        secretKey: secretKey,
-        basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
-      };
+      const fireblocksConfig = config.FIREBLOCKS;
 
       const fireblocksService = new FireblocksService(fireblocksConfig);
       const address = await fireblocksService.getVaultAccountAddress(
@@ -88,7 +78,10 @@ export class FireblocksMidnightSDK {
         assetId
       );
 
-      const blockfrostProjectId = process.env.BLOCKFROST_PROJECT_ID || "";
+      const blockfrostProjectId = config.BLOCKFROST_PROJECT_ID;
+      if (!blockfrostProjectId) {
+        throw new Error("BLOCKFROST_PROJECT_ID is not configured.");
+      }
 
       const claimApiService = new ClaimApiService();
       const provetreeService = new ProvetreeService();
@@ -247,7 +240,7 @@ export class FireblocksMidnightSDK {
         accumulatedAda,
         accumulatedTokenAmount,
       } = utxoResult;
-   
+
       const adaTarget = minRecipientLovelace + transactionFee;
       if (
         accumulatedTokenAmount < requiredTokenAmount ||

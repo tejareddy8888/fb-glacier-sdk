@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { PORT } from "./utils/config.js";
+import { config } from "./utils/config.js";
 import { Express } from "express-serve-static-core";
 import router from "./router.js";
 
@@ -13,8 +13,8 @@ const startServer = () => {
   app.use(router);
   app.use(cors());
 
-  app.listen(PORT, () => {
-    console.log(`Example app listening on port ${PORT}`);
+  app.listen(config.PORT, () => {
+    console.log(`Example app listening on port ${config.PORT}`);
   });
 };
 
