@@ -4,32 +4,23 @@ import {
   TransferPeerPathType,
   VaultWalletAddress,
 } from "@fireblocks/ts-sdk";
-import { blake2b } from "blakejs";
-
+import * as lucid from "lucid-cardano";
+import * as C from "lucid-cardano";
 import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
-import { nightTokenName, tokenTransactionFee } from "./constants.js";
+import {
+  blockfrostUrl,
+  nightTokenName,
+  tokenTransactionFee,
+} from "./constants.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
 import {
-  buildTransaction,
   calculateTtl,
-  createTransactionInputs,
-  createTransactionOutputs,
   fetchAndSelectUtxos,
-  submitTransaction,
 } from "./utils/cardano.utils.js";
-import {
-  Address,
-  Ed25519Signature,
-  PublicKey,
-  Transaction,
-  TransactionWitnessSet,
-  Vkey,
-  Vkeywitness,
-  Vkeywitnesses,
-} from "@emurgo/cardano-serialization-lib-nodejs";
+
 import { config } from "./utils/config.js";
 
 export class FireblocksMidnightSDK {
@@ -40,6 +31,7 @@ export class FireblocksMidnightSDK {
   private vaultAccountId: string;
   private address: string;
   private blockfrostProjectId: string;
+  private lucid!: lucid.Lucid;
 
   constructor(params: {
     fireblocksService: FireblocksService;
@@ -86,7 +78,7 @@ export class FireblocksMidnightSDK {
       const claimApiService = new ClaimApiService();
       const provetreeService = new ProvetreeService();
 
-      return new FireblocksMidnightSDK({
+      const sdkInstance = new FireblocksMidnightSDK({
         fireblocksService,
         claimApiService,
         provetreeService,
@@ -95,6 +87,17 @@ export class FireblocksMidnightSDK {
         address,
         blockfrostProjectId,
       });
+
+      const network = blockfrostUrl.includes("mainnet")
+        ? "Mainnet"
+        : blockfrostUrl.includes("preprod")
+        ? "Preprod"
+        : "Preview";
+      sdkInstance.lucid = await lucid.Lucid.new(
+        new lucid.Blockfrost(blockfrostUrl, blockfrostProjectId),
+        network
+      );
+      return sdkInstance;
     } catch (error: any) {
       throw new Error(
         `Error creating FireblocksMidnightSDK: ${
@@ -213,26 +216,22 @@ export class FireblocksMidnightSDK {
     requiredTokenAmount: number,
     minRecipientLovelace = 1_200_000,
     minChangeLovelace = 1_200_000
-  ): Promise<{
-    txHash: string;
-    senderAddress: string;
-    tokenName: string;
-  }> => {
+  ) => {
     try {
-      const transactionFee = tokenTransactionFee;
+      const transactionFee = BigInt(tokenTransactionFee);
+
+      // 1. Fetch UTXOs & validate
       const utxoResult = await fetchAndSelectUtxos(
         this.address,
         this.blockfrostProjectId,
         tokenPolicyId,
         requiredTokenAmount,
-        transactionFee,
+        Number(transactionFee),
         minRecipientLovelace,
         minChangeLovelace
       );
 
-      if (!utxoResult) {
-        throw new Error("no utxo found");
-      }
+      if (!utxoResult) throw new Error("No UTXOs found");
 
       const {
         blockfrost,
@@ -241,10 +240,11 @@ export class FireblocksMidnightSDK {
         accumulatedTokenAmount,
       } = utxoResult;
 
-      const adaTarget = minRecipientLovelace + transactionFee;
+      const adaTarget = BigInt(minRecipientLovelace) + transactionFee;
+
       if (
-        accumulatedTokenAmount < requiredTokenAmount ||
-        accumulatedAda < adaTarget
+        BigInt(accumulatedTokenAmount) < BigInt(requiredTokenAmount) ||
+        BigInt(accumulatedAda) < adaTarget
       ) {
         throw {
           code: "INSUFFICIENT_BALANCE",
@@ -252,37 +252,85 @@ export class FireblocksMidnightSDK {
           details: {
             requiredTokenAmount,
             accumulatedTokenAmount,
-            requiredAda: adaTarget,
+            requiredAda: Number(adaTarget),
             accumulatedAda,
           },
         };
       }
 
-      const txInputs = createTransactionInputs(selectedUtxos);
-      const recipientAddrObj = Address.from_bech32(recipientAddress);
-      const senderAddrObj = Address.from_bech32(this.address);
-
-      const txOutputs = createTransactionOutputs(
-        minRecipientLovelace,
-        transactionFee,
-        recipientAddrObj,
-        senderAddrObj,
-        tokenPolicyId,
-        nightTokenName,
-        requiredTokenAmount,
-        selectedUtxos
-      );
-      const ttl = await calculateTtl(blockfrost, 2600);
-      const txBody = buildTransaction({
-        txInputs,
-        txOutputs,
-        fee: transactionFee,
-        ttl,
+      // 2. Convert selected UTXOs to Lucid UTxO format
+      const convertedUtxos: lucid.UTxO[] = selectedUtxos.map((utxo) => {
+        const assets: Record<string, bigint> = {};
+        utxo.amount.forEach(({ unit, quantity }) => {
+          assets[unit] = BigInt(quantity);
+        });
+        return {
+          txHash: utxo.tx_hash,
+          outputIndex: utxo.output_index,
+          address: utxo.address,
+          assets,
+        };
       });
 
-      const txBodyBytes = txBody.to_bytes();
-      const hashBytes = blake2b(txBodyBytes, undefined, 32);
-      const txHashHex = Buffer.from(hashBytes).toString("hex");
+      // 3. Build the transaction
+
+      const assetNameUnit =
+        tokenPolicyId + lucid.toHex(Buffer.from(nightTokenName, "utf8"));
+
+      const dummyWallet: lucid.WalletApi = {
+        getNetworkId: async () => 1, // or 0 for testnet
+        getUtxos: async () => [], // empty or mock utxo if needed
+        getBalance: async () => "0",
+        getUsedAddresses: async () => [
+          Buffer.from(
+            lucid.C.Address.from_bech32(this.address).to_bytes()
+          ).toString("hex"),
+        ],
+        getUnusedAddresses: async () => [],
+        getChangeAddress: async () =>
+          Buffer.from(
+            lucid.C.Address.from_bech32(this.address).to_bytes()
+          ).toString("hex"),
+        getRewardAddresses: async () => [],
+        signTx: async () => {
+          throw new Error("signTx not implemented in dummy wallet");
+        },
+        signData: async () => {
+          throw new Error("signData not implemented in dummy wallet");
+        },
+        submitTx: async () => {
+          throw new Error("submitTx not implemented in dummy wallet");
+        },
+        getCollateral: async () => [],
+        experimental: {
+          getCollateral: async () => [],
+          on: () => {},
+          off: () => {},
+        },
+      };
+      this.lucid.selectWallet(dummyWallet);
+      let tx = this.lucid
+        .newTx()
+        .collectFrom(convertedUtxos)
+        .payToAddress(recipientAddress, {
+          lovelace: BigInt(minRecipientLovelace),
+          [assetNameUnit]: BigInt(requiredTokenAmount),
+        })
+        .payToAddress(this.address, {
+          lovelace: BigInt(accumulatedAda) - adaTarget,
+          [assetNameUnit]:
+            BigInt(accumulatedTokenAmount) - BigInt(requiredTokenAmount),
+        });
+
+      const ttl = await calculateTtl(blockfrost, this.lucid, 2600);
+      tx = tx.validTo(ttl);
+
+      // 1. Complete unsigned transaction (TxComplete)
+      const unsignedTx = await tx.complete();
+
+      const txHash = unsignedTx.toHash();
+
+      // 5. Fireblocks raw signing request
       const transactionPayload = {
         assetId: this.assetId,
         operation: TransactionOperation.Raw,
@@ -295,43 +343,61 @@ export class FireblocksMidnightSDK {
           rawMessageData: {
             messages: [
               {
-                content: txHashHex,
+                content: txHash,
                 type: "RAW",
               },
             ],
           },
         },
       };
-      const broadcastTransactionresponse =
-        await this.fireblocksService.broadcastTransaction(transactionPayload);
-      const publicKeyBytes = Uint8Array.from(
-        Buffer.from(broadcastTransactionresponse?.publicKey!, "hex")
+
+      const fbResponse = await this.fireblocksService.broadcastTransaction(
+        transactionPayload
       );
-      const signatureBytes = Uint8Array.from(
-        Buffer.from(broadcastTransactionresponse?.signature?.fullSig!, "hex")
-      );
-      const cardanoPubKey = Vkey.new(PublicKey.from_bytes(publicKeyBytes));
-      const cardanoSig = Ed25519Signature.from_bytes(signatureBytes);
+      if (
+        !fbResponse?.publicKey ||
+        !fbResponse?.signature ||
+        !fbResponse.signature.fullSig
+      ) {
+        throw new Error("Missing publicKey or signature from Fireblocks");
+      }
 
-      const witness = Vkeywitness.new(cardanoPubKey, cardanoSig);
-      const witnesses = Vkeywitnesses.new();
-      witnesses.add(witness);
+      // 🔧 6. Manually construct witness from raw signature
+      const publicKeyBytes = Buffer.from(fbResponse.publicKey, "hex");
+      const signatureBytes = Buffer.from(fbResponse.signature.fullSig, "hex");
+      const publicKey = C.C.PublicKey.from_bytes(publicKeyBytes);
 
-      const witnessSet = TransactionWitnessSet.new();
-      witnessSet.set_vkeys(witnesses);
+      const vkey = C.C.Vkey.new(publicKey);
 
-      const signedTransaction = Transaction.new(txBody, witnessSet);
+      const signature = C.C.Ed25519Signature.from_bytes(signatureBytes);
+      const vkeyWitness = C.C.Vkeywitness.new(vkey, signature);
+      const vkeyWitnesses = C.C.Vkeywitnesses.new();
+      vkeyWitnesses.add(vkeyWitness);
+      const witnessSet = C.C.TransactionWitnessSet.new();
+      witnessSet.set_vkeys(vkeyWitnesses);
 
-      const txHash = await submitTransaction(blockfrost, signedTransaction);
+      // 2. Serialize witness set to bytes and convert to hex string
+      const witnessHex = Buffer.from(witnessSet.to_bytes()).toString("hex");
+
+      // 3. Call assemble with array of hex strings
+      const signedTxComplete = unsignedTx.assemble([witnessHex]);
+
+      // 3. Complete the signed transaction (TxSigned)
+      const signedTx = await signedTxComplete.complete();
+
+      // 4. Serialize and submit the signed transaction
+      const txHexString = signedTx.toString();
+      const submittedHash = await this.lucid.provider.submitTx(txHexString);
       return {
-        txHash,
+        txHash: submittedHash,
         senderAddress: this.address,
-        tokenName: nightTokenName,
+        tokenName: this.assetId,
       };
     } catch (error: any) {
       throw new Error(
-        `Error in transferClaims:
-        ${error instanceof Error ? error.message : error}`
+        `Error in transferClaims: ${
+          error instanceof Error ? error.message : JSON.stringify(error)
+        }`
       );
     }
   };
