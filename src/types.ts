@@ -1,4 +1,4 @@
-import { FireblocksMidnightSDK } from "./FireblocksMidnightSDK";
+import { FireblocksMidnightSDK } from "./FireblocksMidnightSDK.js";
 
 export interface SdkPoolItem {
   sdk: FireblocksMidnightSDK;

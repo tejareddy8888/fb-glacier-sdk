@@ -3,8 +3,8 @@ import {
   SdkManagerMetrics,
   SdkPoolItem,
   SupportedBlockchains,
-} from "../types";
-import { FireblocksMidnightSDK } from "../FireblocksMidnightSDK";
+} from "../types.js";
+import { FireblocksMidnightSDK } from "../FireblocksMidnightSDK.js";
 
 export class SdkManager {
   private sdkPool: Map<string, SdkPoolItem> = new Map();

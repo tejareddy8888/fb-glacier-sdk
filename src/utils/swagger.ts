@@ -1,6 +1,6 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import { config } from "./config";
+import { config } from "./config.js";
 
 const options = {
   definition: {
