@@ -5,21 +5,22 @@ import {
   VaultWalletAddress,
 } from "@fireblocks/ts-sdk";
 import * as lucid from "lucid-cardano";
-import * as C from "lucid-cardano";
 import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
-import { SupportedAssetIds, SupportedBlockchains } from "./types.js";
+import {
+  ClaimHistoryResponse,
+  SubmitClaimResponse,
+  SupportedAssetIds,
+  SupportedBlockchains,
+} from "./types.js";
 import {
   blockfrostUrl,
   nightTokenName,
   tokenTransactionFee,
 } from "./constants.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
-import {
-  calculateTtl,
-  fetchAndSelectUtxos,
-} from "./utils/cardano.utils.js";
+import { calculateTtl, fetchAndSelectUtxos } from "./utils/cardano.utils.js";
 
 import { config } from "./utils/config.js";
 
@@ -51,6 +52,19 @@ export class FireblocksMidnightSDK {
     this.blockfrostProjectId = params.blockfrostProjectId;
   }
 
+  /**
+   * Creates a new instance of `FireblocksMidnightSDK` with the provided parameters.
+   *
+   * This method initializes required services, validates configuration, and sets up the SDK instance
+   * for interacting with Fireblocks and Blockfrost. It throws an error if any required configuration
+   * is missing or if the blockchain is unsupported.
+   *
+   * @param params - The parameters required to create the SDK instance.
+   * @param {string} params.vaultAccountId - The Fireblocks vault account ID to use.
+   * @param {SupportedBlockchains} params.chain - The blockchain to operate on. Must be a supported blockchain.
+   * @returns A promise that resolves to a configured `FireblocksMidnightSDK` instance.
+   * @throws {Error} If the blockchain is unsupported or required configuration is missing.
+   */
   public static create = async (params: {
     vaultAccountId: string;
     chain: SupportedBlockchains;
@@ -107,44 +121,74 @@ export class FireblocksMidnightSDK {
     }
   };
 
-  public checkAddress = async (chain: SupportedBlockchains) => {
+  /**
+   * Checks if the current address is valid for the specified blockchain and fetches it's allocation value.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain to check the address against.
+   * @returns {Promise<number>} Returns a numeric result indicating address validity.
+   * @throws {Error} If address validation fails.
+   */
+  public checkAddressAllocation = async (
+    chain: SupportedBlockchains
+  ): Promise<number> => {
     try {
-      const value = await this.provetreeService.checkAddress(
+      return await this.provetreeService.checkAddressAllocation(
         this.address,
         chain as SupportedBlockchains
       );
-      return value;
     } catch (error: any) {
       throw new Error(
-        `Error in checkAddress:
+        `Error in checkAddressAllocation:
         ${error instanceof Error ? error.message : error}`
       );
     }
   };
 
-  public getClaims = async (chain: SupportedBlockchains) => {
+  /**
+   * Retrieves the claims history for the specified blockchain and address.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain to fetch claims history from.
+   * @returns {Promise<ClaimHistoryResponse[]>} A promise that resolves to an array of claim history responses.
+   * @throws {Error} Throws an error if the claims history cannot be retrieved.
+   */
+  public getClaimsHistory = async (
+    chain: SupportedBlockchains
+  ): Promise<ClaimHistoryResponse[]> => {
     try {
-      const claimResponse = await this.claimApiService.getClaims(
+      return await this.claimApiService.getClaimsHistory(
         chain as SupportedBlockchains,
         this.address
       );
-
-      return claimResponse.data;
     } catch (error: any) {
       throw new Error(
-        `Error in getClaims:
+        `Error in getClaimsHistory:
         ${error instanceof Error ? error.message : error}`
       );
     }
   };
 
+  /**
+   * Submits a claim transaction for the specified blockchain and destination address.
+   *
+   * This method performs the following steps:
+   * 1. Retrieves the origin address from the current instance context.
+   * 2. Determines the claimable amount for the origin address on the specified blockchain using the ProveTree service.
+   * 3. Obtains a message signature and public key from the Fireblocks service, including algorithm and fullSig encoding details.
+   * 4. Handles signature formatting differences—encoding for BTC, ETH, and other asset types as required.
+   * 5. Calls the claims API service to finalize and submit the claim.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain network on which to execute the claim.
+   * @param {string} destinationAddress - The destination address to which the claim is made.
+   * @returns {Promise<SubmitClaimResponse[]>} Resolves with an array of SubmitClaimResponse on successful claim submission.
+   * @throws {Error} Throws on any failure, including missing signature data, Fireblocks response issues, or claim API errors.
+   */
   public makeClaims = async (
     chain: SupportedBlockchains,
     destinationAddress: string
-  ) => {
+  ): Promise<SubmitClaimResponse[]> => {
     try {
       const originAddress = this.address;
-      const amount = await this.provetreeService.checkAddress(
+      const allocationValue = await this.provetreeService.checkAddressAllocation(
         originAddress,
         chain as SupportedBlockchains
       );
@@ -154,7 +198,7 @@ export class FireblocksMidnightSDK {
         this.assetId,
         this.vaultAccountId,
         destinationAddress,
-        amount
+        allocationValue
       );
 
       if (
@@ -191,17 +235,15 @@ export class FireblocksMidnightSDK {
         signature = fbResoponse.signature.fullSig;
       }
 
-      const claimResponse = await this.claimApiService.makeClaims(
+      return await this.claimApiService.makeClaims(
         chain as SupportedBlockchains,
         originAddress,
-        amount,
+        allocationValue,
         message,
         signature,
         destinationAddress,
         publicKey
       );
-
-      return claimResponse.data;
     } catch (error: any) {
       throw new Error(
         `Error in makeClaims:
@@ -210,17 +252,32 @@ export class FireblocksMidnightSDK {
     }
   };
 
+  /**
+   * Transfers a specified amount of native tokens and ADA to a recipient address, handling UTXO selection,
+   * transaction construction, signing via Fireblocks, and submission to the Cardano network.
+   *
+   * @param {string} recipientAddress - The Bech32 address of the recipient to receive tokens and ADA.
+   * @param {string} tokenPolicyId - The policy ID of the native token to transfer.
+   * @param {number} requiredTokenAmount - The amount of the token to transfer.
+   * @param {number} [minRecipientLovelace=1_200_000] - The minimum amount of ADA (in lovelace) to send to the recipient. Defaults to 1,200,000.
+   * @param {number} [minChangeLovelace=1_200_000] - The minimum amount of ADA (in lovelace) to keep as change. Defaults to 1,200,000.
+   * @returns {Promise<{ txHash: string; senderAddress: string; tokenName: SupportedAssetIds; }>} An object containing the transaction hash, sender address, and token name.
+   * @throws {Error} Throws if there are insufficient UTXOs, insufficient balance, or Fireblocks signing fails.
+   */
   public transferClaims = async (
     recipientAddress: string,
     tokenPolicyId: string,
     requiredTokenAmount: number,
-    minRecipientLovelace = 1_200_000,
-    minChangeLovelace = 1_200_000
-  ) => {
+    minRecipientLovelace: number = 1_200_000,
+    minChangeLovelace: number = 1_200_000
+  ): Promise<{
+    txHash: string;
+    senderAddress: string;
+    tokenName: SupportedAssetIds;
+  }> => {
     try {
       const transactionFee = BigInt(tokenTransactionFee);
 
-      // 1. Fetch UTXOs & validate
       const utxoResult = await fetchAndSelectUtxos(
         this.address,
         this.blockfrostProjectId,
@@ -258,7 +315,6 @@ export class FireblocksMidnightSDK {
         };
       }
 
-      // 2. Convert selected UTXOs to Lucid UTxO format
       const convertedUtxos: lucid.UTxO[] = selectedUtxos.map((utxo) => {
         const assets: Record<string, bigint> = {};
         utxo.amount.forEach(({ unit, quantity }) => {
@@ -272,14 +328,12 @@ export class FireblocksMidnightSDK {
         };
       });
 
-      // 3. Build the transaction
-
       const assetNameUnit =
         tokenPolicyId + lucid.toHex(Buffer.from(nightTokenName, "utf8"));
 
       const dummyWallet: lucid.WalletApi = {
         getNetworkId: async () => 1, // or 0 for testnet
-        getUtxos: async () => [], // empty or mock utxo if needed
+        getUtxos: async () => [],
         getBalance: async () => "0",
         getUsedAddresses: async () => [
           Buffer.from(
@@ -325,12 +379,10 @@ export class FireblocksMidnightSDK {
       const ttl = await calculateTtl(blockfrost, this.lucid, 2600);
       tx = tx.validTo(ttl);
 
-      // 1. Complete unsigned transaction (TxComplete)
       const unsignedTx = await tx.complete();
 
       const txHash = unsignedTx.toHash();
 
-      // 5. Fireblocks raw signing request
       const transactionPayload = {
         assetId: this.assetId,
         operation: TransactionOperation.Raw,
@@ -362,30 +414,25 @@ export class FireblocksMidnightSDK {
         throw new Error("Missing publicKey or signature from Fireblocks");
       }
 
-      // 🔧 6. Manually construct witness from raw signature
       const publicKeyBytes = Buffer.from(fbResponse.publicKey, "hex");
       const signatureBytes = Buffer.from(fbResponse.signature.fullSig, "hex");
-      const publicKey = C.C.PublicKey.from_bytes(publicKeyBytes);
+      const publicKey = lucid.C.PublicKey.from_bytes(publicKeyBytes);
 
-      const vkey = C.C.Vkey.new(publicKey);
+      const vkey = lucid.C.Vkey.new(publicKey);
 
-      const signature = C.C.Ed25519Signature.from_bytes(signatureBytes);
-      const vkeyWitness = C.C.Vkeywitness.new(vkey, signature);
-      const vkeyWitnesses = C.C.Vkeywitnesses.new();
+      const signature = lucid.C.Ed25519Signature.from_bytes(signatureBytes);
+      const vkeyWitness = lucid.C.Vkeywitness.new(vkey, signature);
+      const vkeyWitnesses = lucid.C.Vkeywitnesses.new();
       vkeyWitnesses.add(vkeyWitness);
-      const witnessSet = C.C.TransactionWitnessSet.new();
+      const witnessSet = lucid.C.TransactionWitnessSet.new();
       witnessSet.set_vkeys(vkeyWitnesses);
 
-      // 2. Serialize witness set to bytes and convert to hex string
       const witnessHex = Buffer.from(witnessSet.to_bytes()).toString("hex");
 
-      // 3. Call assemble with array of hex strings
       const signedTxComplete = unsignedTx.assemble([witnessHex]);
 
-      // 3. Complete the signed transaction (TxSigned)
       const signedTx = await signedTxComplete.complete();
 
-      // 4. Serialize and submit the signed transaction
       const txHexString = signedTx.toString();
       const submittedHash = await this.lucid.provider.submitTx(txHexString);
       return {
@@ -402,15 +449,21 @@ export class FireblocksMidnightSDK {
     }
   };
 
+  /**
+   * Retrieves the wallet addresses associated with a specific Fireblocks vault account.
+   *
+   * @param {string} vaultAccountId - The unique identifier of the vault account to fetch addresses for.
+   * @returns {Promise<VaultWalletAddress[]>} A promise that resolves to an array of VaultWalletAddress objects.
+   * @throws {Error} Throws an error if the retrieval fails.
+   */
   public getVaultAccountAddresses = async (
     vaultAccountId: string
   ): Promise<VaultWalletAddress[]> => {
     try {
-      const addresses = await this.fireblocksService.getVaultAccountAddresses(
+      return await this.fireblocksService.getVaultAccountAddresses(
         vaultAccountId,
         this.assetId
       );
-      return addresses;
     } catch (error: any) {
       throw new Error(
         `Error in getVaultAccountAddresses:

@@ -13,6 +13,12 @@ const blockchainToAssetIdsMap: Record<SupportedBlockchains, SupportedAssetIds> =
     [SupportedBlockchains.XRP]: SupportedAssetIds.XRP,
   };
 
+/**
+ * Retrieves the supported asset IDs for a given blockchain.
+ *
+ * @param {SupportedBlockchains} chain - The blockchain for which to get the asset IDs. Must be of type {@link SupportedBlockchains}.
+ * @returns {SupportedAssetIds | null} The supported asset IDs for the specified blockchain as {@link SupportedAssetIds}, or `null` if none are found.
+ */
 export const getAssetIdsByBlockchain = (
   chain: SupportedBlockchains
 ): SupportedAssetIds | null => {

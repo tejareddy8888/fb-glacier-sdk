@@ -3,18 +3,32 @@ import {
   FireblocksResponse,
   SignedMessageAlgorithmEnum,
   TransactionOperation,
+  TransactionRequest,
   TransactionResponse,
   TransactionStateEnum,
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 
+/**
+ * Generates a transaction payload for signing messages on various blockchains.
+ *
+ * Depending on the specified blockchain, this function prepares the payload in the required format
+ * and returns a `TransactionRequest` object suitable for Fireblocks SDK operations.
+ *
+ * @param {string} payload - The message or data to be signed, as a string.
+ * @param {SupportedBlockchains} chain - The blockchain for which the transaction payload is being generated.
+ * @param {SupportedAssetIds} assetId - The asset identifier relevant to the transaction.
+ * @param {string} originVaultAccountId - The originating vault account ID as a string.
+ * @returns {Promise<TransactionRequest>} A promise that resolves to a `TransactionRequest` object containing the formatted payload.
+ * @throws Will throw an error if the blockchain is not supported or if any internal error occurs.
+ */
 export const generateTransactionPayload = async (
   payload: string,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
   originVaultAccountId: string
-) => {
+): Promise<TransactionRequest> => {
   try {
     const { MSL } = await import("cardano-web3-js");
     switch (chain) {
@@ -138,6 +152,16 @@ export const generateTransactionPayload = async (
   }
 };
 
+/**
+ * Retrieves the status of a Fireblocks transaction and waits until it is completed.
+ * Polls the transaction status every 3 seconds and logs the current status to the console.
+ * Throws an error if the transaction is blocked, cancelled, failed, or rejected.
+ *
+ * @param {string} txId - The ID of the transaction to check.
+ * @param {Fireblocks} fireblocks - The Fireblocks SDK instance used to fetch transaction details.
+ * @returns {Promise<TransactionResponse>} A promise that resolves to the completed transaction response.
+ * @throws {Error} If the transaction is blocked, cancelled, failed, or rejected.
+ */
 export const getTxStatus = async (
   txId: string,
   fireblocks: Fireblocks
