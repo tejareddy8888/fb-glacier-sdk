@@ -59,3 +59,22 @@ export interface Utxo {
   inline_datum: string | null;
   reference_script_hash: string | null;
 }
+
+export interface SubmitClaimResponse {
+  address: string;
+  amount: number;
+  claim_id: string;
+  dest_address: string;
+}
+
+export interface ClaimHistoryResponse {
+  address: string;
+  amount: number;
+  blockchain: SupportedBlockchains;
+  claim_id: string;
+  confirmation_blocks: any | null;
+  failure: any | null;
+  leaf_index: number;
+  status: string;
+  transaction_id: string | number | null;
+}
