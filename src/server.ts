@@ -5,24 +5,26 @@ import { config } from "./utils/config.js";
 import { Express } from "express-serve-static-core";
 import router from "./router.js";
 import { swaggerSpec, swaggerUi } from "./utils/swagger.js";
+import path from "path";
 
 const startServer = () => {
   const app = express();
 
   configureMiddlewares(app);
 
-  app.use('/api',router);
+  app.use("/api", router);
   app.get("/health", (_req: Request, res: Response) => {
     console.log("alive");
     res.status(200).send("Alive");
   });
-  
+
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
   app.get("/api-docs-json", (_req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.send(swaggerSpec);
-});
-  app.use(cors());
+    res.setHeader("Content-Type", "application/json");
+    res.send(swaggerSpec);
+  });
+
+  app.use("/docs", express.static(path.join(__dirname, "../docs")));
 
   app.listen(config.PORT, () => {
     console.log(`Example app listening on port ${config.PORT}`);
@@ -32,9 +34,7 @@ const startServer = () => {
 const configureMiddlewares = (app: Express) => {
   app.use(
     cors({
-      origin: ["http://localhost:3000"],
-      credentials: true,
-      exposedHeaders: ["Authorization"],
+      origin: [`http://localhost:${config.CLIENT_PORT}`],
     })
   );
   app.use(bodyParser.json());
