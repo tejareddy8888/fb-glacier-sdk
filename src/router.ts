@@ -6,9 +6,9 @@ const apiController = new ApiController();
 
 /**
  * @openapi
- * /api/provetree/check/{chain}/{vaultAccountId}:
+ * /api/check/{chain}/{vaultAccountId}:
  *   get:
- *     summary: Check address existence in Provetree
+ *     summary: Fetches address' allocation value by vault account and blockchain
  *     parameters:
  *       - in: path
  *         name: chain
@@ -22,18 +22,18 @@ const apiController = new ApiController();
  *           type: string
  *     responses:
  *       200:
- *         description: Address found or not
+ *         description: Indicates whether the address was found
  */
 router.get(
-  "/provetree/check/:chain/:vaultAccountId",
-  apiController.checkAddress
+  "/check/:chain/:vaultAccountId",
+  apiController.checkAddressAllocation
 );
 
 /**
  * @openapi
- * /api/claim/claims/{chain}/{vaultAccountId}:
+ * /api/claims/{chain}/{vaultAccountId}:
  *   get:
- *     summary: Get claims for a vault
+ *     summary: Get claims history for a vault
  *     parameters:
  *       - in: path
  *         name: chain
@@ -49,11 +49,11 @@ router.get(
  *       200:
  *         description: List of claims
  */
-router.get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims);
+router.get("/claims/:chain/:vaultAccountId", apiController.getClaimsHistory);
 
 /**
  * @openapi
- * /api/fireblocks/vaults/{chain}/{vaultAccountId}:
+ * /api/vaults/{chain}/{vaultAccountId}:
  *   get:
  *     summary: Get Fireblocks vault addresses
  *     parameters:
@@ -72,13 +72,13 @@ router.get("/claim/claims/:chain/:vaultAccountId", apiController.getClaims);
  *         description: Vault addresses
  */
 router.get(
-  "/fireblocks/vaults/:chain/:vaultAccountId",
+  "/vaults/:chain/:vaultAccountId",
   apiController.getVaultAccountAddresses
 );
 
 /**
  * @openapi
- * /api/claim/transfer:
+ * /api/transfer:
  *   post:
  *     summary: Transfer claim ownership
  *     requestBody:
@@ -95,13 +95,13 @@ router.get(
  *       200:
  *         description: Claim transferred
  */
-router.post("/claim/transfer", apiController.transferClaims);
+router.post("/transfer", apiController.transferClaims);
 
 /**
  * @openapi
- * /api/claim/claims/{chain}:
+ * /api/claims/{chain}:
  *   post:
- *     summary: Make claims
+ *     summary: Make NIGHT claims for a vault account
  *     parameters:
  *       - in: path
  *         name: chain
@@ -121,6 +121,6 @@ router.post("/claim/transfer", apiController.transferClaims);
  *       200:
  *         description: Claims processed
  */
-router.post("/claim/claims/:chain", apiController.makeClaims);
+router.post("/claims/:chain", apiController.makeClaims);
 
 export default router;
