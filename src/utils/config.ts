@@ -11,10 +11,12 @@ const secretKey = readFileSync(secretKeyPath, "utf-8");
 
 export const config: {
   PORT: number;
+  CLIENT_PORT: number;
   FIREBLOCKS: FireblocksConfig;
   BLOCKFROST_PROJECT_ID?: string;
 } = {
   PORT: Number(process.env.PORT) || 8000,
+  CLIENT_PORT: Number(process.env.CLIENT_PORT) || 3000,
   FIREBLOCKS: {
     apiKey: process.env.FIREBLOCKS_API_KEY || "",
     secretKey: secretKey,
