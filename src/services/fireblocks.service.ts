@@ -11,9 +11,12 @@ import {
   generateTransactionPayload,
   getTxStatus,
 } from "../utils/fireblocks.utils.js";
-import {  termsAndConditionsHash } from "../constants.js";
+import { termsAndConditionsHash } from "../constants.js";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 
+/**
+ * Service class for interacting with the Fireblocks SDK.
+ */
 export class FireblocksService {
   private readonly fireblocksSDK: Fireblocks;
 
@@ -25,6 +28,13 @@ export class FireblocksService {
     });
   }
 
+  /**
+   * Broadcasts a transaction to the Fireblocks network.
+   *
+   * @param {TransactionRequest} transactionPayload - The transaction request payload to be broadcasted.
+   * @returns {Promise<{ signature: SignedMessageSignature; content?: string; publicKey?: string; algorithm?: SignedMessageAlgorithmEnum } | null>} The signed message or null if signing fails.
+   * @throws {Error} If there is an issue with the transaction or signing process.
+   */
   public broadcastTransaction = async (
     transactionPayload: TransactionRequest
   ): Promise<{
@@ -64,6 +74,16 @@ export class FireblocksService {
     }
   };
 
+  /**
+   * Signs a message for a transaction using the Fireblocks SDK.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain to sign the message for.
+   * @param {SupportedAssetIds} assetId - The asset ID for which to sign the message.
+   * @param {string} originVaultAccountId - The vault account ID from which the transaction originates.
+   * @param {string} destinationAddress - The address to which the transaction is directed.
+   * @param {number} amount - The amount of the asset to be transferred.
+   * @returns {Promise<{ signature?: SignedMessageSignature; publicKey?: string; algorithm?: SignedMessageAlgorithmEnum; content?: string; message: string } | null>} The signed message or null if signing fails.
+   */
   public signMessage = async (
     chain: SupportedBlockchains,
     assetId: SupportedAssetIds,
@@ -101,6 +121,14 @@ export class FireblocksService {
     }
   };
 
+  /**
+   * Retrieves the default address for a specific vault account and asset.
+   *
+   * @param {string} vaultAccountId - The ID of the vault account.
+   * @param {SupportedAssetIds} assetId - The ID of the asset for which to retrieve the address.
+   * @returns {Promise<string>} The default address associated with the specified vault account and asset.
+   * @throws {Error} If there is an issue retrieving the address.
+   */
   public getVaultAccountAddress = async (
     vaultAccountId: string,
     assetId: SupportedAssetIds
@@ -134,6 +162,14 @@ export class FireblocksService {
     }
   };
 
+  /**
+   * Retrieves all addresses for a specific vault account and asset.
+   *
+   * @param {string} vaultAccountId - The ID of the vault account.
+   * @param {SupportedAssetIds} assetId - The ID of the asset for which to retrieve addresses.
+   * @returns {Promise<VaultWalletAddress[]>} An array of VaultWalletAddress objects containing addresses and their details.
+   * @throws {Error} If there is an issue retrieving the addresses.
+   */
   public getVaultAccountAddresses = async (
     vaultAccountId: string,
     assetId: SupportedAssetIds
@@ -158,6 +194,17 @@ export class FireblocksService {
       );
     }
   };
+
+  /**
+   * Retrieves the public key for a specific asset in a vault account.
+   *
+   * @param {string} vaultAccountId - The ID of the vault account.
+   * @param {SupportedAssetIds} assetId - The ID of the asset for which to retrieve the public key.
+   * @param {number} [change=0] - The change index for the address (default is 0).
+   * @param {number} [addressIndex=0] - The address index (default is 0).
+   * @returns {Promise<string>} The public key associated with the specified asset and vault account.
+   * @throws {Error} If there is an issue retrieving the public key.
+   */
   public getAssetPublicKey = async (
     vaultAccountId: string,
     assetId: SupportedAssetIds,

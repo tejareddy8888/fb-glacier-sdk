@@ -1,41 +1,28 @@
 import axios from "axios";
 import { midnightClaimAdress } from "../constants.js";
-import { SupportedBlockchains } from "../types.js";
+import {
+  ClaimHistoryResponse,
+  SubmitClaimResponse,
+  SupportedBlockchains,
+} from "../types.js";
 
+/**
+ * Service for interacting with the Midnight claim API, providing methods for querying and creating claims across supported blockchains.
+ */
 export class ClaimApiService {
-  constructor() {}
-  public claimByAddress = async (
-    address: string,
-    blockchainId: SupportedBlockchains
-  ) => {
-    try {
-      const response = await axios.get(
-        `${midnightClaimAdress}/claims/${blockchainId}?address=${address}`,
-        {
-          headers: {
-            Accept: "application/json;charset=utf-8",
-          },
-        }
-      );
 
-      if (response.status === 200) {
-        return response.data;
-      } else {
-        throw new Error(`Unexpected response s  tatus: ${response.status}`);
-      }
-    } catch (error: any) {
-      console.error(
-        `Error fetching claims for address ${address}:`,
-        error.error
-      );
-      throw error;
-    }
-  };
-
-  public getClaims = async (
+  /**
+   * Fetches the full claims history for a particular address on a specified blockchain.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain to query.
+   * @param {string} address - The address for which to retrieve the claims history.
+   * @returns {Promise<ClaimHistoryResponse[]>} An array of ClaimHistoryResponse objects detailing the address's claim history.
+   * @throws {Error} On network or API errors; detailed Axios error messages are provided if applicable.
+   */
+  public getClaimsHistory = async (
     chain: SupportedBlockchains,
     address: string
-  ): Promise<any> => {
+  ): Promise<ClaimHistoryResponse[]> => {
     try {
       const response = await axios.get(
         `${midnightClaimAdress}/claims/${chain}?address=${encodeURIComponent(
@@ -43,20 +30,43 @@ export class ClaimApiService {
         )}`
       );
 
-      return response;
+      if (response.status === 200) {
+        return response.data;
+      } else {
+        throw new Error(`Unexpected response status: ${response.status}`);
+      }
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        console.error("Axios error!");
+        console.error("Axios error! - getClaimsHistory");
         console.error("Status:", error.response?.status);
         console.error("Status Text:", error.response?.statusText);
         console.error("Response Data:", error.response?.data);
         console.error("Request URL:", error.config?.url);
+        throw new Error(
+          error.response?.data?.[0]?.error?.message ||
+            "Error fetchin claims data"
+        );
       } else {
         console.error("Unexpected error:", error);
+        throw new Error(error.message || "Error getting claims history");
       }
     }
   };
 
+  /**
+   * Submits a claim transaction to the Claims API for the specified blockchain and parameters.
+   * Builds the request payload according to the blockchain type, including required signatures and fields.
+   *
+   * @param {SupportedBlockchains} chain - The blockchain to submit the claim on.
+   * @param {string} originAddress - The originating address making the claim.
+   * @param {number} amount - The amount to claim.
+   * @param {string} message - The message being signed (typically for signature verification).
+   * @param {string} fullSig - The hex-encoded signature (MSL COSE_Sign1 for Cardano, plain for others).
+   * @param {string} destinationAddress - The address to which the claimed amount is sent.
+   * @param {string} publicKey - The public key corresponding to the signature (used for Cardano claims only).
+   * @returns {Promise<SubmitClaimResponse[]>} An array of SubmitClaimResponse objects containing details of the submitted claim.
+   * @throws {Error} If the transaction fails or the blockchain is unsupported. Axios errors are logged and re-thrown for external handling.
+   */
   public makeClaims = async (
     chain: SupportedBlockchains,
     originAddress: string,
@@ -65,14 +75,14 @@ export class ClaimApiService {
     fullSig: string,
     destinationAddress: string,
     publicKey: string
-  ): Promise<any> => {
+  ): Promise<SubmitClaimResponse[]> => {
     try {
-      const { MSL } = await import("cardano-web3-js");
       let coseSign1Hex: string = "";
       let params: any = {};
 
       switch (chain) {
         case SupportedBlockchains.CARDANO:
+          const { MSL } = await import("cardano-web3-js");
           const protectedHeaders = MSL.HeaderMap.new();
           protectedHeaders.set_algorithm_id(
             MSL.Label.from_algorithm_id(MSL.AlgorithmId.EdDSA)
@@ -138,7 +148,11 @@ export class ClaimApiService {
 
       console.log("midnight makeClame success");
 
-      return response;
+      if (response.status === 200) {
+        return response.data;
+      } else {
+        throw new Error(`Unexpected response status: ${response.status}`);
+      }
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         console.error("Axios error!");

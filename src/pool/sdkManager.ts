@@ -80,7 +80,6 @@ export class SdkManager {
   /**
    * Release an SDK instance back to the pool
    * @param vaultAccountId Vault account ID
-   * @param chain Supported blockchain
    */
   public releaseSdk = (vaultAccountId: string): void => {
     const poolItem = this.sdkPool.get(vaultAccountId);
