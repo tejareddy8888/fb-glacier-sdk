@@ -1,12 +1,15 @@
 import { Request, Response } from "express";
-import { SupportedBlockchains } from "../types.js";
-import { SdkManager } from "../pool/sdkManager.js";
+import {
+  SupportedBlockchains,
+  TransactionType,
+  TransferClaimsResponse,
+} from "../../types.js";
+import { FbNightApiService } from "../apiService.js";
 
 export class ApiController {
-  private sdkManager: SdkManager;
-
-  constructor() {
-    this.sdkManager = new SdkManager();
+  api: FbNightApiService;
+  constructor(api: FbNightApiService) {
+    this.api = api;
   }
 
   /**
@@ -20,11 +23,12 @@ export class ApiController {
   public checkAddressAllocation = async (req: Request, res: Response) => {
     const { vaultAccountId, chain } = req.params;
     try {
-      const sdk = await this.sdkManager.getSdk(
+      const result = await this.api.executeTransaction({
         vaultAccountId,
-        chain as SupportedBlockchains
-      );
-      const result = await sdk.checkAddressAllocation(chain as SupportedBlockchains);
+        chain: chain as SupportedBlockchains,
+        transactionType: TransactionType.CHECK_ADDRESS_ALLOCATION,
+        params: { chain: chain as SupportedBlockchains },
+      });
 
       res.status(200).json({ value: result });
     } catch (error: any) {
@@ -35,20 +39,21 @@ export class ApiController {
 
   /**
    * Handles the request to retrieve the claims history for a specific vault account and blockchain.
-   * 
+   *
    * Responds with the claims history as JSON on success, or an error message on failure.
-   * 
+   *
    * @remarks
    * This method expects `vaultAccountId` and `chain` to be present in the request parameters.
    */
   public getClaimsHistory = async (req: Request, res: Response) => {
     const { vaultAccountId, chain } = req.params;
     try {
-      const sdk = await this.sdkManager.getSdk(
+      const result = await this.api.executeTransaction({
         vaultAccountId,
-        chain as SupportedBlockchains
-      );
-      const result = await sdk.getClaimsHistory(chain as SupportedBlockchains);
+        chain: chain as SupportedBlockchains,
+        transactionType: TransactionType.GET_CLAIMS_HISTORY,
+        params: { chain: chain as SupportedBlockchains },
+      });
       res.status(200).json(result);
     } catch (error: any) {
       console.error("Error in getClaimsHistory:", error.message);
@@ -58,10 +63,10 @@ export class ApiController {
 
   /**
    * Handles the claim creation process for a given blockchain and destination address.
-   * 
+   *
    * This method retrieves the appropriate SDK instance and initiates the claim process.
    * On success, it responds with the claim details; on failure, it returns an error response.
-   * 
+   *
    * @remarks
    * Expects `chain` in request parameters and `originVaultAccountId`, `destinationAddress` in request body.
    */
@@ -69,14 +74,13 @@ export class ApiController {
     const { chain } = req.params;
     const { originVaultAccountId, destinationAddress } = req.body;
     try {
-      const sdk = await this.sdkManager.getSdk(
-        String(originVaultAccountId),
-        chain as SupportedBlockchains
-      );
-      const claims = await sdk.makeClaims(
-        chain as SupportedBlockchains,
-        destinationAddress
-      );
+      const claims = await this.api.executeTransaction({
+        vaultAccountId: originVaultAccountId,
+        chain: chain as SupportedBlockchains,
+        transactionType: TransactionType.MAKE_CLAIMS,
+        params: { chain: chain as SupportedBlockchains, destinationAddress },
+      });
+
       res.status(200).json(claims);
     } catch (error: any) {
       console.error(
@@ -91,7 +95,7 @@ export class ApiController {
 
   /**
    * Handles the transfer of claims from a specified vault account to a recipient address.
-   * 
+   *
    * This method extracts transfer details from the request body, initiates the transfer using the SDK,
    * and responds with the transaction details upon success.
    */
@@ -106,15 +110,18 @@ export class ApiController {
       console.log(
         `Transferring claims from vault ${vaultAccountId} to ${recipientAddress} with policy ${tokenPolicyId} and amount ${requiredTokenAmount}`
       );
-      const sdk = await this.sdkManager.getSdk(
-        String(vaultAccountId),
-        SupportedBlockchains.CARDANO_TESTNET
-      );
-      const { txHash, senderAddress, tokenName } = await sdk.transferClaims(
-        recipientAddress,
-        tokenPolicyId,
-        Number(requiredTokenAmount)
-      );
+      const { txHash, senderAddress, tokenName } =
+        (await this.api.executeTransaction({
+          vaultAccountId,
+          chain: SupportedBlockchains.CARDANO_TESTNET,
+          transactionType: TransactionType.TRANSFER_CLAIMS,
+          params: {
+            recipientAddress,
+            tokenPolicyId,
+            requiredTokenAmount: Number(requiredTokenAmount),
+          },
+        })) as TransferClaimsResponse;
+
       res.status(200).json({
         status: "success",
         transactionHash: txHash,
@@ -147,11 +154,13 @@ export class ApiController {
   public getVaultAccountAddresses = async (req: Request, res: Response) => {
     const { chain, vaultAccountId } = req.params;
     try {
-      const sdk = await this.sdkManager.getSdk(
+      const addresses = await this.api.executeTransaction({
         vaultAccountId,
-        chain as SupportedBlockchains
-      );
-      const addresses = await sdk.getVaultAccountAddresses(vaultAccountId);
+        chain: chain as SupportedBlockchains,
+        transactionType: TransactionType.GET_VAULT_ACCOUNT_ADDRESSES,
+        params: { vaultAccountId },
+      });
+
       res.status(200).json({ addresses: addresses });
     } catch (error: any) {
       console.error("Error in getVaultAccountAddresses:", error.message);

@@ -1,3 +1,4 @@
+import { BasePath } from "@fireblocks/ts-sdk";
 import { FireblocksMidnightSDK } from "./FireblocksMidnightSDK.js";
 
 export interface SdkPoolItem {
@@ -12,6 +13,58 @@ export interface PoolConfig {
   cleanupIntervalMs: number;
   connectionTimeoutMs: number;
   retryAttempts: number;
+}
+
+export interface ApiServiceConfig {
+  apiKey: string;
+  secretKey: string;
+  basePath: BasePath | string;
+  poolConfig?: Partial<PoolConfig>;
+}
+
+export enum TransactionType {
+  CHECK_ADDRESS_ALLOCATION = "checkAddressAllocation",
+  GET_CLAIMS_HISTORY = "getClaimsHistory",
+  MAKE_CLAIMS = "makeClaims",
+  TRANSFER_CLAIMS = "transferClaims",
+  GET_VAULT_ACCOUNT_ADDRESSES = "getVaultAccountAddresses",
+}
+
+export interface checkAddressAllocationOpts {
+  chain: SupportedBlockchains;
+}
+
+export interface getClaimsHistoryOpts {
+  chain: SupportedBlockchains;
+}
+
+export interface makeClaimsOpts {
+  chain: SupportedBlockchains;
+  destinationAddress: string;
+}
+
+export interface trasnsferClaimsOpts {
+  recipientAddress: string;
+  tokenPolicyId: string;
+  requiredTokenAmount: number;
+  minRecipientLovelace?: number;
+  minChangeLovelace?: number;
+}
+
+export interface getVaultAccountAddressesOpts {
+  vaultAccountId: string;
+}
+
+export interface ExecuteTransactionOpts {
+  vaultAccountId: string;
+  chain: SupportedBlockchains;
+  transactionType: TransactionType;
+  params:
+    | checkAddressAllocationOpts
+    | getClaimsHistoryOpts
+    | makeClaimsOpts
+    | trasnsferClaimsOpts
+    | getVaultAccountAddressesOpts;
 }
 
 export interface SdkManagerMetrics {
@@ -58,6 +111,12 @@ export interface Utxo {
   data_hash: string | null;
   inline_datum: string | null;
   reference_script_hash: string | null;
+}
+
+export interface TransferClaimsResponse {
+  txHash: string;
+  senderAddress: string;
+  tokenName: SupportedAssetIds;
 }
 
 export interface SubmitClaimResponse {

@@ -1,4 +1,5 @@
 import {
+  ConfigurationOptions,
   SignedMessageAlgorithmEnum,
   TransactionOperation,
   TransferPeerPathType,
@@ -9,10 +10,16 @@ import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
 import {
+  checkAddressAllocationOpts,
   ClaimHistoryResponse,
+  getClaimsHistoryOpts,
+  getVaultAccountAddressesOpts,
+  makeClaimsOpts,
   SubmitClaimResponse,
   SupportedAssetIds,
   SupportedBlockchains,
+  TransferClaimsResponse,
+  trasnsferClaimsOpts,
 } from "./types.js";
 import {
   blockfrostUrl,
@@ -66,17 +73,16 @@ export class FireblocksMidnightSDK {
    * @throws {Error} If the blockchain is unsupported or required configuration is missing.
    */
   public static create = async (params: {
+    fireblocksConfig: ConfigurationOptions;
     vaultAccountId: string;
     chain: SupportedBlockchains;
   }): Promise<FireblocksMidnightSDK> => {
     try {
-      const { vaultAccountId, chain } = params;
+      const { fireblocksConfig, vaultAccountId, chain } = params;
       const assetId = getAssetIdsByBlockchain(chain);
       if (!assetId) {
         throw new Error(`Unsupported blockchain: ${chain}`);
       }
-
-      const fireblocksConfig = config.FIREBLOCKS;
 
       const fireblocksService = new FireblocksService(fireblocksConfig);
       const address = await fireblocksService.getVaultAccountAddress(
@@ -122,19 +128,19 @@ export class FireblocksMidnightSDK {
   };
 
   /**
-   * Checks if the current address is valid for the specified blockchain and fetches it's allocation value.
+   * Checks if the current address is valid for the specified blockchain and fetches its allocation value.
    *
    * @param {SupportedBlockchains} chain - The blockchain to check the address against.
-   * @returns {Promise<number>} Returns a numeric result indicating address validity.
-   * @throws {Error} If address validation fails.
+   * @returns {Promise<number>} Returns a numeric result indicating address allocation value.
+   * @throws {Error} If address validation fails or allocation cannot be fetched.
    */
-  public checkAddressAllocation = async (
-    chain: SupportedBlockchains
-  ): Promise<number> => {
+  public checkAddressAllocation = async ({
+    chain,
+  }: checkAddressAllocationOpts): Promise<number> => {
     try {
       return await this.provetreeService.checkAddressAllocation(
         this.address,
-        chain as SupportedBlockchains
+        chain
       );
     } catch (error: any) {
       throw new Error(
@@ -151,9 +157,9 @@ export class FireblocksMidnightSDK {
    * @returns {Promise<ClaimHistoryResponse[]>} A promise that resolves to an array of claim history responses.
    * @throws {Error} Throws an error if the claims history cannot be retrieved.
    */
-  public getClaimsHistory = async (
-    chain: SupportedBlockchains
-  ): Promise<ClaimHistoryResponse[]> => {
+  public getClaimsHistory = async ({
+    chain,
+  }: getClaimsHistoryOpts): Promise<ClaimHistoryResponse[]> => {
     try {
       return await this.claimApiService.getClaimsHistory(
         chain as SupportedBlockchains,
@@ -170,28 +176,25 @@ export class FireblocksMidnightSDK {
   /**
    * Submits a claim transaction for the specified blockchain and destination address.
    *
-   * This method performs the following steps:
-   * 1. Retrieves the origin address from the current instance context.
-   * 2. Determines the claimable amount for the origin address on the specified blockchain using the ProveTree service.
-   * 3. Obtains a message signature and public key from the Fireblocks service, including algorithm and fullSig encoding details.
-   * 4. Handles signature formatting differences—encoding for BTC, ETH, and other asset types as required.
-   * 5. Calls the claims API service to finalize and submit the claim.
+   * This method performs multiple steps using the Fireblocks and ProveTree services.
    *
-   * @param {SupportedBlockchains} chain - The blockchain network on which to execute the claim.
-   * @param {string} destinationAddress - The destination address to which the claim is made.
-   * @returns {Promise<SubmitClaimResponse[]>} Resolves with an array of SubmitClaimResponse on successful claim submission.
-   * @throws {Error} Throws on any failure, including missing signature data, Fireblocks response issues, or claim API errors.
+   * @param {makeClaimsOpts} opts - The options for the claim (chain, destinationAddress).
+   * @param {SupportedBlockchains} opts.chain - The blockchain network on which to execute the claim.
+   * @param {string} opts.destinationAddress - The destination address for the claim.
+   * @returns {Promise<SubmitClaimResponse[]>} Resolves with claim submission result.
+   * @throws {Error} On signature or service errors.
    */
-  public makeClaims = async (
-    chain: SupportedBlockchains,
-    destinationAddress: string
-  ): Promise<SubmitClaimResponse[]> => {
+  public makeClaims = async ({
+    chain,
+    destinationAddress,
+  }: makeClaimsOpts): Promise<SubmitClaimResponse[]> => {
     try {
       const originAddress = this.address;
-      const allocationValue = await this.provetreeService.checkAddressAllocation(
-        originAddress,
-        chain as SupportedBlockchains
-      );
+      const allocationValue =
+        await this.provetreeService.checkAddressAllocation(
+          originAddress,
+          chain as SupportedBlockchains
+        );
 
       const fbResoponse = await this.fireblocksService.signMessage(
         chain as SupportedBlockchains,
@@ -253,28 +256,29 @@ export class FireblocksMidnightSDK {
   };
 
   /**
-   * Transfers a specified amount of native tokens and ADA to a recipient address, handling UTXO selection,
-   * transaction construction, signing via Fireblocks, and submission to the Cardano network.
+   * Transfers native tokens and ADA to a recipient address on Cardano.
    *
-   * @param {string} recipientAddress - The Bech32 address of the recipient to receive tokens and ADA.
-   * @param {string} tokenPolicyId - The policy ID of the native token to transfer.
-   * @param {number} requiredTokenAmount - The amount of the token to transfer.
-   * @param {number} [minRecipientLovelace=1_200_000] - The minimum amount of ADA (in lovelace) to send to the recipient. Defaults to 1,200,000.
-   * @param {number} [minChangeLovelace=1_200_000] - The minimum amount of ADA (in lovelace) to keep as change. Defaults to 1,200,000.
-   * @returns {Promise<{ txHash: string; senderAddress: string; tokenName: SupportedAssetIds; }>} An object containing the transaction hash, sender address, and token name.
-   * @throws {Error} Throws if there are insufficient UTXOs, insufficient balance, or Fireblocks signing fails.
+   * This method:
+   * - Selects UTXOs to cover the required token and ADA amounts.
+   * - Constructs and signs the transaction using Fireblocks.
+   * - Submits the transaction to the Cardano network.
+   *
+   * @param {trasnsferClaimsOpts} opts - Options for transferring claims.
+   * @param {string} opts.recipientAddress - Recipient's Bech32 address.
+   * @param {string} opts.tokenPolicyId - Native token policy ID.
+   * @param {number} opts.requiredTokenAmount - Amount of token to transfer.
+   * @param {number} [opts.minRecipientLovelace=1_200_000] - Minimum ADA for recipient (default: 1,200,000).
+   * @param {number} [opts.minChangeLovelace=1_200_000] - Minimum ADA for change (default: 1,200,000).
+   * @returns {Promise<TransferClaimsResponse>} Transaction hash, sender address, and token name.
+   * @throws {Error} If UTXOs/balance are insufficient, or Fireblocks signing fails.
    */
-  public transferClaims = async (
-    recipientAddress: string,
-    tokenPolicyId: string,
-    requiredTokenAmount: number,
-    minRecipientLovelace: number = 1_200_000,
-    minChangeLovelace: number = 1_200_000
-  ): Promise<{
-    txHash: string;
-    senderAddress: string;
-    tokenName: SupportedAssetIds;
-  }> => {
+  public transferClaims = async ({
+    recipientAddress,
+    tokenPolicyId,
+    requiredTokenAmount,
+    minRecipientLovelace = 1_200_000,
+    minChangeLovelace = 1_200_000,
+  }: trasnsferClaimsOpts): Promise<TransferClaimsResponse> => {
     try {
       const transactionFee = BigInt(tokenTransactionFee);
 
@@ -456,9 +460,9 @@ export class FireblocksMidnightSDK {
    * @returns {Promise<VaultWalletAddress[]>} A promise that resolves to an array of VaultWalletAddress objects.
    * @throws {Error} Throws an error if the retrieval fails.
    */
-  public getVaultAccountAddresses = async (
-    vaultAccountId: string
-  ): Promise<VaultWalletAddress[]> => {
+  public getVaultAccountAddresses = async ({
+    vaultAccountId,
+  }: getVaultAccountAddressesOpts): Promise<VaultWalletAddress[]> => {
     try {
       return await this.fireblocksService.getVaultAccountAddresses(
         vaultAccountId,

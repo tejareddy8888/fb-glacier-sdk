@@ -5,13 +5,20 @@ import {
   SupportedBlockchains,
 } from "../types.js";
 import { FireblocksMidnightSDK } from "../FireblocksMidnightSDK.js";
+import { ConfigurationOptions } from "@fireblocks/ts-sdk";
 
 export class SdkManager {
   private sdkPool: Map<string, SdkPoolItem> = new Map();
+  private baseConfig: ConfigurationOptions;
   private poolConfig: PoolConfig;
   private cleanupInterval: NodeJS.Timeout;
 
-  constructor(poolConfig?: Partial<PoolConfig>) {
+  constructor(
+    baseConfig: ConfigurationOptions,
+    poolConfig?: Partial<PoolConfig>
+  ) {
+    this.baseConfig = baseConfig;
+
     this.poolConfig = {
       maxPoolSize: poolConfig?.maxPoolSize || 100,
       idleTimeoutMs: poolConfig?.idleTimeoutMs || 30 * 60 * 1000, // 30 minutes
@@ -99,7 +106,19 @@ export class SdkManager {
     vaultAccountId: string,
     chain: SupportedBlockchains
   ): Promise<FireblocksMidnightSDK> {
-    return await FireblocksMidnightSDK.create({ vaultAccountId, chain });
+    try {
+      return await FireblocksMidnightSDK.create({
+        fireblocksConfig: this.baseConfig,
+        vaultAccountId,
+        chain,
+      });
+    } catch (error) {
+      console.error(
+        `Failed to create SDK instance for vault ${vaultAccountId} on chain ${chain}:`,
+        error
+      );
+      throw error;
+    }
   }
 
   /**
