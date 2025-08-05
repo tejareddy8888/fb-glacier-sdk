@@ -53,6 +53,13 @@ export class FireblocksService {
       if (!txId) throw new Error("Transaction ID is undefined.");
 
       const completedTx = await getTxStatus(txId, this.fireblocksSDK);
+      if (
+        !completedTx?.signedMessages ||
+        completedTx.signedMessages.length === 0
+      ) {
+        throw new Error("No signed messages returned from Fireblocks");
+      }
+
       const signatureData = completedTx.signedMessages?.[0];
       if (signatureData?.signature) {
         return {

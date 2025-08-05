@@ -153,48 +153,58 @@ export const generateTransactionPayload = async (
 };
 
 /**
- * Retrieves the status of a Fireblocks transaction and waits until it is completed.
- * Polls the transaction status every 3 seconds and logs the current status to the console.
+ * Polls the status of a Fireblocks transaction until it is completed or reaches a terminal state.
+ * Logs status changes to the console during polling.
  * Throws an error if the transaction is blocked, cancelled, failed, or rejected.
  *
- * @param {string} txId - The ID of the transaction to check.
- * @param {Fireblocks} fireblocks - The Fireblocks SDK instance used to fetch transaction details.
- * @returns {Promise<TransactionResponse>} A promise that resolves to the completed transaction response.
- * @throws {Error} If the transaction is blocked, cancelled, failed, or rejected.
+ * @param {string} txId - The transaction ID to monitor.
+ * @param {Fireblocks} fireblocks - The Fireblocks SDK instance for fetching transaction details.
+ * @param {number} [pollingInterval] - Optional polling interval in milliseconds.
+ * @returns {Promise<TransactionResponse>} Resolves with the transaction response when completed or broadcasting.
+ * @throws {Error} If the transaction reaches a terminal failure state.
  */
 export const getTxStatus = async (
   txId: string,
-  fireblocks: Fireblocks
+  fireblocks: Fireblocks,
+  pollingInterval?: number
 ): Promise<TransactionResponse> => {
   try {
-    let response: FireblocksResponse<TransactionResponse> =
+    let txResponse: FireblocksResponse<TransactionResponse> =
       await fireblocks.transactions.getTransaction({ txId });
-    let tx: TransactionResponse = response.data;
-    let messageToConsole: string = `Transaction ${tx.id} is currently at status - ${tx.status}`;
+    let lastStatus = txResponse.data.status;
+    console.log(
+      `Transaction ${txResponse.data.id} is currently at status - ${txResponse.data.status}`
+    );
 
-    console.log(messageToConsole);
-    while (tx.status !== TransactionStateEnum.Completed) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+    while (
+      txResponse.data.status !== TransactionStateEnum.Completed &&
+      txResponse.data.status !== TransactionStateEnum.Broadcasting
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, pollingInterval));
+      txResponse = await fireblocks.transactions.getTransaction({
+        txId: txId,
+      });
 
-      response = await fireblocks.transactions.getTransaction({ txId });
-      tx = response.data;
+      if (txResponse.data.status !== lastStatus) {
+        console.log(
+          `Transaction ${txResponse.data.id} is currently at status - ${txResponse.data.status}`
+        );
+        lastStatus = txResponse.data.status;
+      }
 
-      switch (tx.status) {
+      switch (txResponse.data.status) {
         case TransactionStateEnum.Blocked:
         case TransactionStateEnum.Cancelled:
         case TransactionStateEnum.Failed:
         case TransactionStateEnum.Rejected:
           throw new Error(
-            `Signing request failed/blocked/cancelled: Transaction: ${tx.id} status is ${tx.status}`
+            `Signing request failed/blocked/cancelled: Transaction: ${txResponse.data.id} status is ${txResponse.data.status}\nSub-Status: ${txResponse.data.subStatus}`
           );
         default:
-          console.log(messageToConsole);
           break;
       }
     }
-    while (tx.status !== TransactionStateEnum.Completed);
-
-    return tx;
+    return txResponse.data;
   } catch (error) {
     throw error;
   }
