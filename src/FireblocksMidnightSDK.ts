@@ -400,7 +400,6 @@ export class FireblocksMidnightSDK {
             messages: [
               {
                 content: txHash,
-                type: "RAW",
               },
             ],
           },
