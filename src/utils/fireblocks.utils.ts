@@ -30,9 +30,9 @@ export const generateTransactionPayload = async (
   originVaultAccountId: string
 ): Promise<TransactionRequest> => {
   try {
-    const { MSL } = await import("cardano-web3-js");
     switch (chain) {
       case SupportedBlockchains.CARDANO:
+        const { MSL } = await import("cardano-web3-js");
         const payloadBytes = new TextEncoder().encode(payload);
 
         const protectedHeaders = MSL.HeaderMap.new();
@@ -52,23 +52,16 @@ export const generateTransactionPayload = async (
         return {
           source: {
             type: TransferPeerPathType.VaultAccount,
+            id: String(originVaultAccountId),
           },
-
+          assetId: "ADA",
           operation: TransactionOperation.Raw,
           extraParameters: {
             rawMessageData: {
-              algorithm: SignedMessageAlgorithmEnum.EddsaEd25519,
               messages: [
                 {
                   content,
-                  type: "RAW",
-                  derivationPath: [
-                    44,
-                    1815,
-                    Number(originVaultAccountId),
-                    2,
-                    0,
-                  ],
+                  bip44change: 2,
                 },
               ],
             },
@@ -134,7 +127,6 @@ export const generateTransactionPayload = async (
               messages: [
                 {
                   content: solHexMessage,
-                  type: "RAW",
                 },
               ],
             },
