@@ -24,7 +24,6 @@ export class FbNightApiService {
   private sdkManager: SdkManager;
 
   constructor(config: ApiServiceConfig) {
-    console.log("FbNightApiService config", config);
     if (!config || typeof config !== "object") {
       throw new Error("InvalidConfig, Config object is required.");
     }
