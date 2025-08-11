@@ -364,14 +364,12 @@ The SDK supports the following blockchain networks:
 
 | Chain | Network | Token | Fireblocks Asset ID |
 |-------|---------|-------|---------------------|
-| BITCOIN | Mainnet/Testnet | BTC | BTC / BTC_TEST |
-| ETHEREUM | Mainnet/Goerli | ETH | ETH / ETH_TEST3 |
-| CARDANO | Mainnet/Preprod | ADA/NIGHT | ADA / ADA_TEST |
+| BITCOIN | Mainnet | BTC | BTC / BTC_TEST |
+| ETHEREUM | Mainnet | ETH | ETH |
+| CARDANO | Mainnet/Preprod | ADA | ADA / ADA_TEST |
 | BNB | BNB Smart Chain | BNB | BNB_BSC |
 | SOLANA | Mainnet/Devnet | SOL | SOL / SOL_TEST |
 | AVALANCHE | C-Chain | AVAX | AVAX |
-| XRP | XRP Ledger | XRP | XRP / XRP_TEST |
-| BAT | Basic Attention | BAT | BAT_TEST |
 
 
 ## API Documentation
@@ -404,3 +402,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Fireblocks Documentation](https://developers.fireblocks.com)
 - [Blockfrost Documentation](https://docs.blockfrost.io)
 - [API Documentation](http://localhost:8000/api-docs)
+
