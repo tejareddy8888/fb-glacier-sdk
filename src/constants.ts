@@ -1,0 +1,15 @@
+// export const midnightProvtreeAdress = "https://proof-staging.provtree-midnight.com"; // pre-prod
+export const midnightProvtreeAdress = "https://proof.provtree-midnight.com"; // prod
+
+// export const midnightClaimAdress = "https://external-claim.gd.midnighttge.io"; // pre-prod
+export const midnightClaimAdress = "https://mainnet.prod.gd.midnighttge.io"; // prod
+
+export const termsAndConditionsHash =
+  "6bf2adf825baa496729e2eac1e895ebc77973744bce67f44276bf6006f5c21de863ed121e11828d8fc0241773191e26dc1134803a681a9a98ba0ae812553db24";
+
+export const blockfrostUrl = "https://cardano-preprod.blockfrost.io/api/v0/";
+
+// export const nightTokenName = "NIGHT";
+export const nightTokenName = "MIN";
+
+export const tokenTransactionFee = 200000;
