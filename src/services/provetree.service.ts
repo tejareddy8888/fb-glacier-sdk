@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { midnightProvtreeAdress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
+import axiosInstance from "../utils/httpClient.js";
 
 /**
  * Service for interacting with the Provetree API, providing methods to check addresses and retrieve proof data.
@@ -20,7 +21,7 @@ export class ProvetreeService {
     blockchainId: SupportedBlockchains
   ): Promise<number> => {
     try {
-      const response = await axios.get(
+      const response = await axiosInstance.get(
         `${midnightProvtreeAdress}/check/${blockchainId}/${address}`,
         {
           headers: {
@@ -48,12 +49,16 @@ export class ProvetreeService {
     requestData: object
   ): Promise<any> => {
     try {
-      const response = await axios.post(midnightProvtreeAdress, requestData, {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          Authorization: `Bearer ${apiKey}`,
-        },
-      });
+      const response = await axiosInstance.post(
+        midnightProvtreeAdress,
+        requestData,
+        {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            Authorization: `Bearer ${apiKey}`,
+          },
+        }
+      );
 
       if (response.status === 200) {
         return response.data;

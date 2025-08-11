@@ -5,12 +5,12 @@ import {
   SubmitClaimResponse,
   SupportedBlockchains,
 } from "../types.js";
+import axiosInstance from "../utils/httpClient.js";
 
 /**
  * Service for interacting with the Midnight claim API, providing methods for querying and creating claims across supported blockchains.
  */
 export class ClaimApiService {
-
   /**
    * Fetches the full claims history for a particular address on a specified blockchain.
    *
@@ -24,7 +24,7 @@ export class ClaimApiService {
     address: string
   ): Promise<ClaimHistoryResponse[]> => {
     try {
-      const response = await axios.get(
+      const response = await axiosInstance.get(
         `${midnightClaimAdress}/claims/${chain}?address=${encodeURIComponent(
           address
         )}`
@@ -141,7 +141,7 @@ export class ClaimApiService {
 
       console.log("makeClaim params", params);
 
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `${midnightClaimAdress}/claims/${chain}`,
         params
       );
