@@ -43,7 +43,7 @@ PORT=8000
 # Fireblocks Configuration
 FIREBLOCKS_API_KEY=your_fireblocks_api_key
 FIREBLOCKS_SECRET_KEY_PATH=./secrets/fireblocks_secret.key
-BASE_PATH=https://api.fireblocks.io 
+BASE_PATH=https://api.fireblocks.io
 
 # Blockfrost Configuration (for Cardano tokens transfers)
 BLOCKFROST_PROJECT_ID=your_blockfrost_project_id
@@ -65,87 +65,97 @@ mkdir -p secrets
 #### 1. Direct SDK Usage in TypeScript
 
 ```typescript
-import { FireblocksMidnightSDK } from './src/FireblocksMidnightSDK';
-import { SupportedBlockchains } from './src/types';
+import { FireblocksMidnightSDK } from "./src/FireblocksMidnightSDK";
+import { SupportedBlockchains } from "./src/types";
+import { ConfigurationOptions } from "@fireblocks/ts-sdk";
 
 // Create SDK instance using the static create method
 // The SDK will automatically initialize all required services internally
-async function initializeSdk(vaultAccountId: string, chain: SupportedBlockchains) {
+async function initializeSdk(
+  fireblocksConfig: ConfigurationOptions,
+  vaultAccountId: string,
+  chain: SupportedBlockchains
+) {
   const sdk = await FireblocksMidnightSDK.create({
+    fireblocksConfig,
     vaultAccountId,
-    chain
+    chain,
   });
   return sdk;
 }
 
 // Example: Check eligibility for claims
-async function checkEligibility() {
-  const vaultAccountId = 'your-vault-id';
-  const chain = SupportedBlockchains.CARDANO;
-  
+async function checkEligibility(
+  vaultAccountId: string = "your-vault-id",
+  chain: SupportedBlockchains = SupportedBlockchains.CARDANO
+) {
   // Initialize SDK for this vault and chain
   const sdk = await initializeSdk(vaultAccountId, chain);
-  
+
   // Check if address exists in Provetree (returns amount if eligible)
-  const amount = await sdk.checkAddress(chain);
+  const amount = await sdk.checkAddressAllocation(chain);
   const isEligible = amount > 0;
-  
+
   console.log(`Vault ${vaultAccountId} eligibility: ${isEligible}`);
   console.log(`Claimable amount: ${amount}`);
 }
 
 // Example: Get historical claims (hitorical)
-async function getAvailableClaims() {
-  const vaultAccountId = 'your-vault-id';
-  const chain = SupportedBlockchains.ETHEREUM;
-  
+async function getClaimsHistory(
+  vaultAccountId: string = "your-vault-id",
+  chain: SupportedBlockchains = SupportedBlockchains.ETHEREUM
+) {
   // Initialize SDK for this vault and chain
   const sdk = await initializeSdk(vaultAccountId, chain);
-  
+
   // Get claims from the claims API
-  const claims = await sdk.getClaims(chain);
-  console.log('Available claims:', claims);
+  const claims = await sdk.getClaimsHistory(chain);
+  console.log("Available claims:", claims);
 }
 
 // Example: Execute claims
-async function executeClaims() {
-  const vaultAccountId = 'your-vault-id';
-  const chain = SupportedBlockchains.CARDANO;
-  const destinationAddress = 'addr1_destination_address'; // Where to send claimed tokens
-  
+async function executeClaims(
+  vaultAccountId: string = "your-vault-id",
+  chain: SupportedBlockchains = SupportedBlockchains.CARDANO,
+  destinationAddress: string = "addr1_destination_address" // Where to send claimed tokens
+) {
   try {
     // Initialize SDK for this vault and chain
     const sdk = await initializeSdk(vaultAccountId, chain);
-    
+
     // Make claims to the specified destination address
     const result = await sdk.makeClaims(chain, destinationAddress);
-    console.log('Claims executed successfully:', result);
+    console.log("Claims executed successfully:", result);
   } catch (error) {
-    console.error('Claim execution failed:', error);
+    console.error("Claim execution failed:", error);
   }
 }
 
 // Example: Transfer NIGHT tokens on Cardano
-async function transferNightTokens() {
-  const fromVaultId = 'source-vault-id';
-  const recipientAddress = 'addr1_destination_address';
-  const tokenPolicyId = 'your_token_policy_id'; // NIGHT token policy ID
-  const tokenAmount = 1000; // Amount of NIGHT tokens to transfer
-  
+async function transferNightTokens(
+  fromVaultId: string = "source-vault-id",
+  recipientAddress: string = "addr1_destination_address",
+  tokenPolicyId: string = "your_token_policy_id", // NIGHT token policy ID
+  tokenAmount: string = 1000, // Amount of NIGHT tokens to transfer
+  minRecipientLovelace?: number, // Minimum ADA for recipient (default: 1,200,000)
+  minChangeLovelace?: number // Minimum ADA for change (default: 1,200,000)
+) {
   try {
     // Initialize SDK for Cardano
     const sdk = await initializeSdk(fromVaultId, SupportedBlockchains.CARDANO);
-    
+
     // Transfer claims/tokens to recipient
     const result = await sdk.transferClaims(
       recipientAddress,
       tokenPolicyId,
-      tokenAmount
+      tokenAmount,
+      minRecipientLovelace,
+      minChangeLovelace
     );
-    console.log('Transfer successful:', result);
-    console.log('Transaction hash:', result.txHash);
+    console.log("Transfer successful:", result);
+    console.log("Transaction hash:", result.txHash);
   } catch (error) {
-    console.error('Transfer failed:', error);
+    console.error("Transfer failed:", error);
   }
 }
 
@@ -159,37 +169,44 @@ transferNightTokens().catch(console.error);
 #### 2. Using the SDK Pool Manager
 
 ```typescript
-import { SdkManager } from './src/pool/sdkManager';
-import { SupportedBlockchains } from './src/types';
+import { SdkManager } from "./src/pool/sdkManager";
+import { SupportedBlockchains } from "./src/types";
+import { config } from ".src/utils/config.js";
+
+const baseConfig = {
+  apiKey: config.FIREBLOCKS.apiKey || "",
+  secretKey: config.FIREBLOCKS.secretKey || "",
+  basePath: (config.FIREBLOCKS.basePath as BasePath) || BasePath.US,
+};
 
 // Initialize SDK pool manager
-const sdkManager = new SdkManager({
-  maxPoolSize: 100,            // Maximum number of SDK instances
-  idleTimeoutMs: 1800000,      // 30 minutes idle timeout
-  cleanupIntervalMs: 300000,   // 5 minutes cleanup interval
-  connectionTimeoutMs: 30000,  // 30 seconds connection timeout
-  retryAttempts: 3             // Number of retry attempts
+const sdkManager = new SdkManager(baseConfig, {
+  maxPoolSize: 100, // Maximum number of SDK instances
+  idleTimeoutMs: 1800000, // 30 minutes idle timeout
+  cleanupIntervalMs: 300000, // 5 minutes cleanup interval
+  connectionTimeoutMs: 30000, // 30 seconds connection timeout
+  retryAttempts: 3, // Number of retry attempts
 });
 
 // Get SDK instance from pool
 async function performOperationsWithPool() {
-  const vaultAccountId = 'your-vault-id';
+  const vaultAccountId = "your-vault-id";
   const chain = SupportedBlockchains.ETHEREUM;
-  
+
   // Get or create SDK instance for vault and chain
   // The pool automatically manages instance lifecycle
   const sdk = await sdkManager.getSdk(vaultAccountId, chain);
-  
+
   // Perform operations
-  const claims = await sdk.getClaims(chain);
-  console.log('Claims:', claims);
-  
+  const claims = await sdk.getClaimsHistory(chain);
+  console.log("Claims:", claims);
+
   // SDK instance is automatically returned to pool after use
   // and can be reused for subsequent requests
 }
 
 // Cleanup on shutdown
-process.on('SIGTERM', () => {
+process.on("SIGTERM", () => {
   sdkManager.cleanup();
   process.exit(0);
 });
@@ -245,6 +262,7 @@ docker-compose down
 ```
 
 The `docker-compose.yml` configuration:
+
 - Mounts the Fireblocks secret key from `./secrets`
 - Loads environment variables from `.env`
 - Exposes the API on port 8000
@@ -257,126 +275,155 @@ The SDK provides a REST API accessible at `http://localhost:8000`. Full API docu
 ### API Endpoints
 
 #### 1. Check Address in Provetree
+
 ```bash
 # Check if an address is eligible for claims
-curl -X GET "http://localhost:8000/api/provetree/check/CARDANO/vault-123"
+curl -X GET "http://localhost:8000/api/check/cardano/vault-123"
 ```
 
 Response:
+
 ```json
 {
-  "exists": true,
-  "address": "addr1_example_address"
+  "value": 1000000000 // NIGHT alocation value
 }
 ```
 
 #### 2. Get Available Claims
+
 ```bash
 # Get all available claims for a vault
-curl -X GET "http://localhost:8000/api/claim/claims/ETHEREUM/vault-123"
+curl -X GET "http://localhost:8000/api/claims/avax/vault-123"
 ```
 
 Response:
+
 ```json
-{
-  "claims": [
-    {
-      "amount": "1000000000",
-      "claimId": "claim-id-123",
-      "status": "available"
-    }
-  ]
-}
+[
+  {
+    "address": "0x1e538dacdb32ef8d5728a50fe27d3fb25f78f0cb",
+    "amount": 2134677,
+    "blockchain": "avax",
+    "claim_id": "d1c8dc2f-7a02-850d-173d-b67959e78085",
+    "confirmation_blocks": null,
+    "failure": null,
+    "leaf_index": 31225197,
+    "status": "queued",
+    "transaction_id": null
+  }
+]
 ```
 
 #### 3. Execute Claims
+
 ```bash
 # Execute claims for a specific chain
-curl -X POST "http://localhost:8000/api/claim/claims/CARDANO" \
-  -H "Content-Type: application/json" \
+curl -X POST "http://localhost:8000/api/claims/cardano" \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
   -d '{
-    "vaultAccountId": "vault-123"
-  }'
+  "originVaultAccountId": "vault-123",
+  "destinationAddress": "0x1234567890abcdef1234567890abcdef12345678"
+}'
 ```
 
 Response:
+
 ```json
-{
-  "success": true,
-  "transactionHash": "tx_hash_123",
-  "claimedAmount": "1000000000"
-}
+[
+  {
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "amount": "1000000000",
+    "claim_id": "abc123",
+    "dest_address": "0x0987654321abcdef0987654321abcdef87654321"
+  }
+]
 ```
 
 #### 4. Transfer NIGHT Tokens
+
 ```bash
 # Transfer NIGHT tokens between addresses
 curl -X POST "http://localhost:8000/api/claim/transfer" \
   -H "Content-Type: application/json" \
   -d '{
-    "fromVaultId": "vault-123",
-    "toAddress": "addr1_destination_address",
-    "amount": "1000000000"
+    "sourceVaultId": "vault-123",
+    "destinationVaultId": "addr1_destination_address",
+    "claimId": "abc123"
   }'
 ```
 
 Response:
+
 ```json
 {
-  "success": true,
-  "transactionHash": "tx_hash_456"
+  "transactionHash": "tx_hash_456",
+  "senderAddress": "addr1_sender_address",
+  "tokenName": "NIGHT"
 }
 ```
 
 #### 5. Get Fireblocks Vault Addresses
+
 ```bash
 # Get deposit addresses for a vault
-curl -X GET "http://localhost:8000/api/fireblocks/vaults/BITCOIN/vault-123"
+curl -X GET "http://localhost:8000/api/vaults/bitcoin/vault-123"
 ```
 
 Response:
+
 ```json
 {
-  "vaultAccountId": "vault-123",
-  "chain": "BITCOIN",
-  "address": "bc1q_example_address"
+  "addresses": [
+    {
+      "assetId": "BTC",
+      "address": "btc1q_example_address",
+      "description": "",
+      "tag": "",
+      "type": "Permanent",
+      "addressFormat": "SEGWIT",
+      "legacyAddress": "btc1NZ_example_address",
+      "enterpriseAddress": "",
+      "bip44AddressIndex": 0,
+      "userDefined": false
+    }
+  ],
+  ...
 }
 ```
 
 #### 6. Health Check
+
 ```bash
 # Check service health
-curl -X GET "http://localhost:8000/api/health"
+curl -X GET "http://localhost:8000/health"
 ```
 
 Response:
+
 ```json
-{
-  "status": "healthy",
-  "uptime": 12345,
-  "version": "1.0.0"
-}
+Alive
 ```
 
 ### Supported Blockchains
 
 The SDK supports the following blockchain networks:
 
-| Chain | Network | Token | Fireblocks Asset ID |
-|-------|---------|-------|---------------------|
-| BITCOIN | Mainnet | BTC | BTC / BTC_TEST |
-| ETHEREUM | Mainnet | ETH | ETH |
-| CARDANO | Mainnet/Preprod | ADA | ADA / ADA_TEST |
-| BNB | BNB Smart Chain | BNB | BNB_BSC |
-| SOLANA | Mainnet/Devnet | SOL | SOL / SOL_TEST |
-| AVALANCHE | C-Chain | AVAX | AVAX |
-
+| Chain     | Network         | Token | Fireblocks Asset ID |
+| --------- | --------------- | ----- | ------------------- |
+| BITCOIN   | Mainnet         | BTC   | BTC / BTC_TEST      |
+| ETHEREUM  | Mainnet         | ETH   | ETH                 |
+| CARDANO   | Mainnet/Preprod | ADA   | ADA / ADA_TEST      |
+| BNB       | BNB Smart Chain | BNB   | BNB_BSC             |
+| SOLANA    | Mainnet/Devnet  | SOL   | SOL / SOL_TEST      |
+| AVALANCHE | C-Chain         | AVAX  | AVAX                |
 
 ## API Documentation
 
 ### Swagger Documentation
 
 Access the interactive API documentation at:
+
 - Swagger UI: `http://localhost:8000/api-docs`
 - OpenAPI JSON: `http://localhost:8000/api-docs-json`
 
@@ -402,4 +449,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Fireblocks Documentation](https://developers.fireblocks.com)
 - [Blockfrost Documentation](https://docs.blockfrost.io)
 - [API Documentation](http://localhost:8000/api-docs)
-
