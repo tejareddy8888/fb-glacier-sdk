@@ -12,7 +12,7 @@ const options = {
     },
     servers: [
       {
-        url: `http://localhost:${config.PORT}/api`,
+        url: `http://localhost:${config.PORT}/`,
         description: "Local server",
       },
     ],
