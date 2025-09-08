@@ -21,11 +21,7 @@ import {
   TransferClaimsResponse,
   trasnsferClaimsOpts,
 } from "./types.js";
-import {
-  blockfrostUrl,
-  nightTokenName,
-  tokenTransactionFee,
-} from "./constants.js";
+import { nightTokenName, tokenTransactionFee } from "./constants.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
 import { calculateTtl, fetchAndSelectUtxos } from "./utils/cardano.utils.js";
 
@@ -38,7 +34,7 @@ export class FireblocksMidnightSDK {
   private assetId: SupportedAssetIds;
   private vaultAccountId: string;
   private address: string;
-  private blockfrostProjectId: string;
+  private blockfrostProjectId?: string;
   private lucid!: lucid.Lucid;
 
   constructor(params: {
@@ -48,7 +44,7 @@ export class FireblocksMidnightSDK {
     assetId: SupportedAssetIds;
     vaultAccountId: string;
     address: string;
-    blockfrostProjectId: string;
+    blockfrostProjectId?: string;
   }) {
     this.fireblocksService = params.fireblocksService;
     this.claimApiService = params.claimApiService;
@@ -91,9 +87,6 @@ export class FireblocksMidnightSDK {
       );
 
       const blockfrostProjectId = config.BLOCKFROST_PROJECT_ID;
-      if (!blockfrostProjectId) {
-        throw new Error("BLOCKFROST_PROJECT_ID is not configured.");
-      }
 
       const claimApiService = new ClaimApiService();
       const provetreeService = new ProvetreeService();
@@ -108,15 +101,17 @@ export class FireblocksMidnightSDK {
         blockfrostProjectId,
       });
 
-      const network = blockfrostUrl.includes("mainnet")
-        ? "Mainnet"
-        : blockfrostUrl.includes("preprod")
-        ? "Preprod"
-        : "Preview";
-      sdkInstance.lucid = await lucid.Lucid.new(
-        new lucid.Blockfrost(blockfrostUrl, blockfrostProjectId),
-        network
-      );
+      if (blockfrostProjectId) {
+        const network = blockfrostProjectId.includes("mainnet")
+          ? "Mainnet"
+          : blockfrostProjectId.includes("preprod")
+          ? "Preprod"
+          : "Preview";
+        sdkInstance.lucid = await lucid.Lucid.new(
+          new lucid.Blockfrost(blockfrostProjectId, blockfrostProjectId),
+          network
+        );
+      }
       return sdkInstance;
     } catch (error: any) {
       throw new Error(
@@ -144,8 +139,9 @@ export class FireblocksMidnightSDK {
       );
     } catch (error: any) {
       throw new Error(
-        `Error in checkAddressAllocation:
-        ${error instanceof Error ? error.message : error}`
+        `Error in checkAddressAllocation: ${
+          error instanceof Error ? error.message : error
+        }`
       );
     }
   };
@@ -279,6 +275,9 @@ export class FireblocksMidnightSDK {
     minRecipientLovelace = 1_200_000,
     minChangeLovelace = 1_200_000,
   }: trasnsferClaimsOpts): Promise<TransferClaimsResponse> => {
+    if (!this.blockfrostProjectId) {
+      throw new Error("Blockfrost project id was not provided.");
+    }
     try {
       const transactionFee = BigInt(tokenTransactionFee);
 
