@@ -1,5 +1,3 @@
-import axios from "axios";
-
 import { midnightProvtreeAdress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
 import axiosInstance from "../utils/httpClient.js";
