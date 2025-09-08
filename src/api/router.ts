@@ -90,9 +90,10 @@ export const configureRouter = (api: FbNightApiService): Router => {
    *           schema:
    *             type: object
    *             example:
-   *               sourceVaultId: "123"
-   *               destinationVaultId: "456"
-   *               claimId: "abc123"
+   *               vaultAccountId: "123"
+   *               recipientAddress: "addr1qxyz"
+   *               tokenPolicyId: "abc123"
+   *               requiredTokenAmount: 1000
    *     responses:
    *       200:
    *         description: Claim transferred
