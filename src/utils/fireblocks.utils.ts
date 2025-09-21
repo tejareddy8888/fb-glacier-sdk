@@ -1,7 +1,6 @@
 import {
   Fireblocks,
   FireblocksResponse,
-  SignedMessageAlgorithmEnum,
   TransactionOperation,
   TransactionRequest,
   TransactionResponse,
@@ -9,6 +8,9 @@ import {
   TransferPeerPathType,
 } from "@fireblocks/ts-sdk";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
+import { convertStringToHex } from "xrpl";
+import { encodeForSigning } from "ripple-binary-codec";
+import { createHash } from "crypto";
 
 /**
  * Generates a transaction payload for signing messages on various blockchains.
@@ -27,7 +29,9 @@ export const generateTransactionPayload = async (
   payload: string,
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
-  originVaultAccountId: string
+  originVaultAccountId: string,
+  note?: string,
+  fireblocks?: Fireblocks
 ): Promise<TransactionRequest> => {
   try {
     switch (chain) {
@@ -54,8 +58,9 @@ export const generateTransactionPayload = async (
             type: TransferPeerPathType.VaultAccount,
             id: String(originVaultAccountId),
           },
-          assetId: "ADA",
+          assetId: SupportedAssetIds.ADA,
           operation: TransactionOperation.Raw,
+          note: note,
           extraParameters: {
             rawMessageData: {
               messages: [
@@ -72,6 +77,7 @@ export const generateTransactionPayload = async (
         return {
           operation: TransactionOperation.TypedMessage,
           assetId: assetId,
+          note: note,
           source: {
             type: TransferPeerPathType.VaultAccount,
             id: originVaultAccountId,
@@ -96,6 +102,7 @@ export const generateTransactionPayload = async (
         return {
           operation: TransactionOperation.TypedMessage,
           assetId: assetId,
+          note: note,
           source: {
             type: TransferPeerPathType.VaultAccount,
             id: originVaultAccountId,
@@ -112,11 +119,54 @@ export const generateTransactionPayload = async (
           },
         };
 
+      case SupportedBlockchains.XRP:
+        const publicKeyResponse =
+          await fireblocks?.vaults.getPublicKeyInfoForAddress({
+            vaultAccountId: originVaultAccountId,
+            assetId: assetId,
+            change: 0,
+            addressIndex: 0,
+          });
+
+        const txForSigning = {
+          SigningPubKey: publicKeyResponse?.data.publicKey,
+          Account: "rwsuY5xVszjUuga2fSui1Jmknu6R8dW88B",
+          Memos: [
+            {
+              Memo: {
+                MemoData: convertStringToHex(payload),
+              },
+            },
+          ],
+        };
+
+        const signingData = encodeForSigning(txForSigning);
+        const messageHash = createHash("sha512")
+          .update(Buffer.from(signingData, "hex"))
+          .digest("hex")
+          .slice(0, 64);
+
+        return {
+          assetId: "XRP",
+          note,
+          source: {
+            type: TransferPeerPathType.VaultAccount,
+            id: originVaultAccountId,
+          },
+          operation: TransactionOperation.Raw,
+          extraParameters: {
+            rawMessageData: {
+              messages: [{ content: messageHash }],
+            },
+          },
+        };
+
       case SupportedBlockchains.SOLANA:
         const solHexMessage = Buffer.from(payload, "utf8").toString("hex");
         return {
           operation: TransactionOperation.Raw,
           assetId: assetId,
+          note: note,
           source: {
             type: TransferPeerPathType.VaultAccount,
 
@@ -133,14 +183,14 @@ export const generateTransactionPayload = async (
           },
         };
 
-      case SupportedBlockchains.XRP:
-        return {};
-
       default:
         throw new Error("block chain is not supported.");
     }
   } catch (error: any) {
-    throw new Error(`${error.message}`);
+    throw new Error(
+      `Error in generateTransactionPayload:
+        ${error instanceof Error ? error.message : error}`
+    );
   }
 };
 

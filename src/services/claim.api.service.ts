@@ -1,5 +1,5 @@
 import axios from "axios";
-import { midnightClaimAdress } from "../constants.js";
+import { midnightClaimAddress } from "../constants.js";
 import {
   ClaimHistoryResponse,
   SubmitClaimResponse,
@@ -14,20 +14,22 @@ export class ClaimApiService {
   /**
    * Fetches the full claims history for a particular address on a specified blockchain.
    *
-   * @param {SupportedBlockchains} chain - The blockchain to query.
+   * @param {SupportedBlockchains} blockchainId - The blockchain to query.
    * @param {string} address - The address for which to retrieve the claims history.
    * @returns {Promise<ClaimHistoryResponse[]>} An array of ClaimHistoryResponse objects detailing the address's claim history.
    * @throws {Error} On network or API errors; detailed Axios error messages are provided if applicable.
    */
   public getClaimsHistory = async (
-    chain: SupportedBlockchains,
+    blockchainId: SupportedBlockchains,
     address: string
   ): Promise<ClaimHistoryResponse[]> => {
     try {
       const response = await axiosInstance.get(
-        `${midnightClaimAdress}/claims/${chain}?address=${encodeURIComponent(
-          address
-        )}`
+        blockchainId === SupportedBlockchains.XRP
+          ? `${midnightClaimAddress}/claims/ripple/${address}`
+          : `${midnightClaimAddress}/claims/${blockchainId}?address=${encodeURIComponent(
+              address
+            )}`
       );
 
       if (response.status === 200) {
@@ -135,15 +137,35 @@ export class ClaimApiService {
           ];
           break;
 
+        case SupportedBlockchains.XRP:
+          params = [
+            {
+              address: originAddress,
+              amount,
+              dest_address: destinationAddress,
+              pubkey: publicKey,
+              signature: fullSig,
+            },
+          ];
+          break;
+
         default:
           throw new Error(`chain ${chain} is not supported.`);
       }
 
       console.log("makeClaim params", params);
 
-      const response = await axiosInstance.post(
-        `${midnightClaimAdress}/claims/${chain}`,
-        params
+      const response = await axios.post(
+        `${midnightClaimAddress}/claims/${chain}`,
+        params,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json;charset=utf-8",
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+          },
+        }
       );
 
       console.log("midnight makeClame success");
@@ -155,15 +177,20 @@ export class ClaimApiService {
       }
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        console.error("Axios error!");
+        console.error("Axios error! - makeClaims");
         console.error("Status:", error.response?.status);
         console.error("Status Text:", error.response?.statusText);
         console.error("Response Data:", error.response?.data);
         console.error("Request URL:", error.config?.url);
+        throw new Error(
+          error.response?.data?.[0]?.error?.message ||
+            error.response?.data?.message ||
+            "Error making claims"
+        );
       } else {
         console.error("Unexpected error:", error);
+        throw new Error(error.message || "Error making claims");
       }
-      throw error;
     }
   };
 }
