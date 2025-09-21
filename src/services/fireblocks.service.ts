@@ -53,13 +53,6 @@ export class FireblocksService {
       if (!txId) throw new Error("Transaction ID is undefined.");
 
       const completedTx = await getTxStatus(txId, this.fireblocksSDK);
-      if (
-        !completedTx?.signedMessages ||
-        completedTx.signedMessages.length === 0
-      ) {
-        throw new Error("No signed messages returned from Fireblocks");
-      }
-
       const signatureData = completedTx.signedMessages?.[0];
       if (signatureData?.signature) {
         return {
@@ -91,12 +84,14 @@ export class FireblocksService {
    * @param {number} amount - The amount of the asset to be transferred.
    * @returns {Promise<{ signature?: SignedMessageSignature; publicKey?: string; algorithm?: SignedMessageAlgorithmEnum; content?: string; message: string } | null>} The signed message or null if signing fails.
    */
-  public signMessage = async (
+ public signMessage = async (
     chain: SupportedBlockchains,
     assetId: SupportedAssetIds,
     originVaultAccountId: string,
     destinationAddress: string,
-    amount: number
+    amount: number,
+    vaultName?: string,
+    originAddress?: string
   ): Promise<{
     signature?: SignedMessageSignature;
     publicKey?: string;
@@ -107,12 +102,24 @@ export class FireblocksService {
     try {
       const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
 
+      console.log("signMessage payload", payload);
+      
+      // Format the amount for display (convert from smallest unit)
+      const displayAmount = (amount / Math.pow(10, 6)).toFixed(6);
+      const note = vaultName && originAddress 
+        ? `Claiming ${displayAmount} NIGHT for ${assetId} from ${originAddress} in Vault ${vaultName} to address ${destinationAddress}`
+        : `Claiming ${displayAmount} NIGHT for ${assetId} to address ${destinationAddress}`;
+
       const transactionPayload = await generateTransactionPayload(
         payload,
         chain,
         assetId,
-        originVaultAccountId
+        originVaultAccountId,
+        note
       );
+
+      console.log("signMessage transactionPayload", transactionPayload);
+
       if (!transactionPayload) {
         throw new Error("Failed to generate transaction payload");
       }
