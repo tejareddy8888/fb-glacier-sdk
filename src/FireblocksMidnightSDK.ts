@@ -38,8 +38,8 @@ export class FireblocksMidnightSDK {
   private assetId: SupportedAssetIds;
   private vaultAccountId: string;
   private address: string;
-  private blockfrostProjectId: string;
-  private lucid!: lucid.Lucid;
+  private blockfrostProjectId?: string;
+  private lucid?: lucid.Lucid;
 
   constructor(params: {
     fireblocksService: FireblocksService;
@@ -48,7 +48,7 @@ export class FireblocksMidnightSDK {
     assetId: SupportedAssetIds;
     vaultAccountId: string;
     address: string;
-    blockfrostProjectId: string;
+    blockfrostProjectId?: string;
   }) {
     this.fireblocksService = params.fireblocksService;
     this.claimApiService = params.claimApiService;
@@ -92,7 +92,9 @@ export class FireblocksMidnightSDK {
 
       const blockfrostProjectId = config.BLOCKFROST_PROJECT_ID;
       if (!blockfrostProjectId) {
-        throw new Error("BLOCKFROST_PROJECT_ID is not configured.");
+        console.warn(
+          "[warn] BLOCKFROST_PROJECT_ID is not configured. Some features may not work."
+        );
       }
 
       const claimApiService = new ClaimApiService();
@@ -108,15 +110,18 @@ export class FireblocksMidnightSDK {
         blockfrostProjectId,
       });
 
-      const network = blockfrostUrl.includes("mainnet")
-        ? "Mainnet"
-        : blockfrostUrl.includes("preprod")
-        ? "Preprod"
-        : "Preview";
-      sdkInstance.lucid = await lucid.Lucid.new(
-        new lucid.Blockfrost(blockfrostUrl, blockfrostProjectId),
-        network
-      );
+      // Only initialize Lucid if blockfrostProjectId is available
+      if (blockfrostProjectId) {
+        const network = blockfrostUrl.includes("mainnet")
+          ? "Mainnet"
+          : blockfrostUrl.includes("preprod")
+          ? "Preprod"
+          : "Preview";
+        sdkInstance.lucid = await lucid.Lucid.new(
+          new lucid.Blockfrost(blockfrostUrl, blockfrostProjectId),
+          network
+        );
+      }
       return sdkInstance;
     } catch (error: any) {
       throw new Error(
@@ -201,7 +206,9 @@ export class FireblocksMidnightSDK {
         this.assetId,
         this.vaultAccountId,
         destinationAddress,
-        allocationValue
+        allocationValue,
+        this.vaultAccountId,
+        originAddress
       );
 
       if (
@@ -229,6 +236,10 @@ export class FireblocksMidnightSDK {
             fbResoponse.signature.fullSig;
 
           signature = Buffer.from(encodedSig, "hex").toString("base64");
+        } else if (this.assetId === SupportedAssetIds.XRP) {
+          const rHex = r.padStart(64, "0");
+          const sHex = s.padStart(64, "0");
+          signature = (rHex + sHex).toUpperCase();
         } else {
           const ethV = v + 27;
 
@@ -238,7 +249,7 @@ export class FireblocksMidnightSDK {
         signature = fbResoponse.signature.fullSig;
       }
 
-      return await this.claimApiService.makeClaims(
+      const claimResponse = await this.claimApiService.makeClaims(
         chain as SupportedBlockchains,
         originAddress,
         allocationValue,
@@ -247,11 +258,10 @@ export class FireblocksMidnightSDK {
         destinationAddress,
         publicKey
       );
+
+      return claimResponse;
     } catch (error: any) {
-      throw new Error(
-        `Error in makeClaims:
-        ${error instanceof Error ? error.message : error}`
-      );
+      throw new Error(error instanceof Error ? error.message : error);
     }
   };
 
@@ -281,6 +291,23 @@ export class FireblocksMidnightSDK {
   }: trasnsferClaimsOpts): Promise<TransferClaimsResponse> => {
     try {
       const transactionFee = BigInt(tokenTransactionFee);
+
+      if (!this.blockfrostProjectId) {
+        throw new Error("BLOCKFROST_PROJECT_ID is not configured.");
+      }
+
+      // Initialize Lucid if not already initialized
+      if (!this.lucid) {
+        const network = blockfrostUrl.includes("mainnet")
+          ? "Mainnet"
+          : blockfrostUrl.includes("preprod")
+          ? "Preprod"
+          : "Preview";
+        this.lucid = await lucid.Lucid.new(
+          new lucid.Blockfrost(blockfrostUrl, this.blockfrostProjectId),
+          network
+        );
+      }
 
       const utxoResult = await fetchAndSelectUtxos(
         this.address,
