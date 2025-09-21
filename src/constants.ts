@@ -1,11 +1,11 @@
-// export const midnightProvtreeAdress = "https://proof-staging.provtree-midnight.com"; // pre-prod
-export const midnightProvtreeAdress = "https://proof.provtree-midnight.com"; // prod
+// export const midnightProvtreeAddress = "https://proof-staging.provtree-midnight.com"; // pre-prod
+export const midnightProvtreeAddress = "https://proof.provtree-midnight.com"; // prod
 
-// export const midnightClaimAdress = "https://external-claim.gd.midnighttge.io"; // pre-prod
-export const midnightClaimAdress = "https://mainnet.prod.gd.midnighttge.io"; // prod
+// export const midnightClaimAddress = "https://external-claim.gd.midnighttge.io"; // pre-prod
+export const midnightClaimAddress = "https://mainnet.prod.gd.midnighttge.io"; // prod
 
 export const termsAndConditionsHash =
-  "6bf2adf825baa496729e2eac1e895ebc77973744bce67f44276bf6006f5c21de863ed121e11828d8fc0241773191e26dc1134803a681a9a98ba0ae812553db24";
+  "31a6bab50a84b8439adcfb786bb2020f6807e6e8fda629b424110fc7bb1c6b8b";
 
 export const blockfrostUrl = "https://cardano-preprod.blockfrost.io/api/v0/";
 
