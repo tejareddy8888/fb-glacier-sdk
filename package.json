@@ -43,9 +43,12 @@
     "ethers": "^6.15.0",
     "express": "^5.1.0",
     "lucid-cardano": "^0.10.11",
+    "ripple-binary-codec": "^2.5.0",
+    "ripple-keypairs": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "ts-node": "^10.9.2",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "xrpl": "^4.4.1"
   }
 }
