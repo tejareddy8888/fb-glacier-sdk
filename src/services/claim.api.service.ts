@@ -26,7 +26,9 @@ export class ClaimApiService {
     try {
       const response = await axiosInstance.get(
         blockchainId === SupportedBlockchains.XRP
-          ? `${midnightClaimAddress}/claims/ripple/${address}`
+          ? `${midnightClaimAddress}/claims/ripple?address=${encodeURIComponent(
+              address
+            )}`
           : `${midnightClaimAddress}/claims/${blockchainId}?address=${encodeURIComponent(
               address
             )}`
