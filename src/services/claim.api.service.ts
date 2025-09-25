@@ -24,15 +24,10 @@ export class ClaimApiService {
     address: string
   ): Promise<ClaimHistoryResponse[]> => {
     try {
-      const response = await axiosInstance.get(
-        blockchainId === SupportedBlockchains.XRP
-          ? `${midnightClaimAddress}/claims/ripple?address=${encodeURIComponent(
-              address
-            )}`
-          : `${midnightClaimAddress}/claims/${blockchainId}?address=${encodeURIComponent(
-              address
-            )}`
-      );
+      const url = `${midnightClaimAddress}/claims/${blockchainId}?address=${encodeURIComponent(
+        address
+      )}`;
+      const response = await axiosInstance.get(url);
 
       if (response.status === 200) {
         return response.data;
