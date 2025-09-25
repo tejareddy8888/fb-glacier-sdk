@@ -30,8 +30,8 @@ export const generateTransactionPayload = async (
   chain: SupportedBlockchains,
   assetId: SupportedAssetIds,
   originVaultAccountId: string,
-  note?: string,
-  fireblocks?: Fireblocks
+  fireblocks: Fireblocks,
+  note?: string
 ): Promise<TransactionRequest> => {
   try {
     switch (chain) {

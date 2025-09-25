@@ -116,8 +116,8 @@ export class FireblocksService {
         chain,
         assetId,
         originVaultAccountId,
-        note,
-        this.fireblocksSDK
+        this.fireblocksSDK,
+        note
       );
 
       console.log("signMessage transactionPayload", transactionPayload);
