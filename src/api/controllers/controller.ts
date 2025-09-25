@@ -30,9 +30,14 @@ export class ApiController {
         params: { chain: chain as SupportedBlockchains },
       });
 
+      console.log(
+        `[info] ${chain} allocation value for vault account no. ${vaultAccountId}:`,
+        result
+      );
+
       res.status(200).json({ value: result });
     } catch (error: any) {
-      console.error("Error in checkAddressAllocation:", error.message);
+      console.error("[error] Error in checkAddressAllocation:", error.message);
       res.status(500).json({ error: error.message });
     }
   };
@@ -54,9 +59,10 @@ export class ApiController {
         transactionType: TransactionType.GET_CLAIMS_HISTORY,
         params: { chain: chain as SupportedBlockchains },
       });
+      console.log(`[info] Claims history retrieved successfully:`, result);
       res.status(200).json(result);
     } catch (error: any) {
-      console.error("Error in getClaimsHistory:", error.message);
+      console.error("[error] Error in getClaimsHistory:", error.message);
       res.status(500).json({ error: error.message });
     }
   };
@@ -81,10 +87,12 @@ export class ApiController {
         params: { chain: chain as SupportedBlockchains, destinationAddress },
       });
 
+      console.log("[info] Claimed NIGHT successfully:", claims);
+
       res.status(200).json(claims);
     } catch (error: any) {
       console.error(
-        "Error in makeClaims:",
+        "[error] Error in makeClaims:",
         error instanceof Error ? error.message : error
       );
       res
@@ -122,6 +130,10 @@ export class ApiController {
           },
         })) as TransferClaimsResponse;
 
+      console.log(
+        `[info] Transfer successful. TxHash: ${txHash}, Sender: ${senderAddress}, TokenName: ${tokenName}, Amount: ${requiredTokenAmount}`
+      );
+
       res.status(200).json({
         status: "success",
         transactionHash: txHash,
@@ -133,7 +145,7 @@ export class ApiController {
       });
     } catch (error: any) {
       console.error(
-        "Error in transferClaims:",
+        "[error] Error in transferClaims:",
         error instanceof Error ? error.message : error
       );
       res
