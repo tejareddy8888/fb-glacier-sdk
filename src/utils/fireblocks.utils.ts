@@ -9,8 +9,8 @@ import {
 } from "@fireblocks/ts-sdk";
 import { SupportedAssetIds, SupportedBlockchains } from "../types.js";
 import { convertStringToHex } from "xrpl";
-import { encodeForSigning } from "ripple-binary-codec";
-import { createHash } from "crypto";
+import { encode } from "ripple-binary-codec";
+import { hashTx } from "xrpl/dist/npm/utils/hashes/index.js";
 
 /**
  * Generates a transaction payload for signing messages on various blockchains.
@@ -126,11 +126,33 @@ export const generateTransactionPayload = async (
             assetId: assetId,
             change: 0,
             addressIndex: 0,
+            compressed: true,
           });
+
+        const addressResponse =
+          await fireblocks?.vaults.getVaultAccountAssetAddressesPaginated({
+            vaultAccountId: originVaultAccountId,
+            assetId: assetId,
+          });
+
+        const senderAddress = addressResponse?.data?.addresses?.[0].address;
+
+        if (!publicKeyResponse?.data.publicKey) {
+          throw new Error(
+            `Error fetching public key for vault account ${originVaultAccountId}`
+          );
+        }
+
+        if (!senderAddress) {
+          throw new Error(
+            `Error fetching address for vault account ${originVaultAccountId}`
+          );
+        }
 
         const txForSigning = {
           SigningPubKey: publicKeyResponse?.data.publicKey,
-          Account: "rwsuY5xVszjUuga2fSui1Jmknu6R8dW88B",
+
+          Account: senderAddress,
           Memos: [
             {
               Memo: {
@@ -140,11 +162,8 @@ export const generateTransactionPayload = async (
           ],
         };
 
-        const signingData = encodeForSigning(txForSigning);
-        const messageHash = createHash("sha512")
-          .update(Buffer.from(signingData, "hex"))
-          .digest("hex")
-          .slice(0, 64);
+        const binary = encode(txForSigning);
+        const xrpContent = hashTx(binary);
 
         return {
           assetId: "XRP",
@@ -156,8 +175,9 @@ export const generateTransactionPayload = async (
           operation: TransactionOperation.Raw,
           extraParameters: {
             rawMessageData: {
-              messages: [{ content: messageHash }],
+              messages: [{ content: xrpContent }],
             },
+            unhashedTransaction: txForSigning,
           },
         };
 

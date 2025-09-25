@@ -237,9 +237,7 @@ export class FireblocksMidnightSDK {
 
           signature = Buffer.from(encodedSig, "hex").toString("base64");
         } else if (this.assetId === SupportedAssetIds.XRP) {
-          const rHex = r.padStart(64, "0");
-          const sHex = s.padStart(64, "0");
-          signature = (rHex + sHex).toUpperCase();
+          signature = (r + s).toUpperCase();
         } else {
           const ethV = v + 27;
 

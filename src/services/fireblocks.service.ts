@@ -84,7 +84,7 @@ export class FireblocksService {
    * @param {number} amount - The amount of the asset to be transferred.
    * @returns {Promise<{ signature?: SignedMessageSignature; publicKey?: string; algorithm?: SignedMessageAlgorithmEnum; content?: string; message: string } | null>} The signed message or null if signing fails.
    */
- public signMessage = async (
+  public signMessage = async (
     chain: SupportedBlockchains,
     assetId: SupportedAssetIds,
     originVaultAccountId: string,
@@ -103,19 +103,21 @@ export class FireblocksService {
       const payload = `STAR ${amount} to ${destinationAddress} ${termsAndConditionsHash}`;
 
       console.log("signMessage payload", payload);
-      
+
       // Format the amount for display (convert from smallest unit)
       const displayAmount = (amount / Math.pow(10, 6)).toFixed(6);
-      const note = vaultName && originAddress 
-        ? `Claiming ${displayAmount} NIGHT for ${assetId} from ${originAddress} in Vault ${vaultName} to address ${destinationAddress}`
-        : `Claiming ${displayAmount} NIGHT for ${assetId} to address ${destinationAddress}`;
+      const note =
+        vaultName && originAddress
+          ? `Claiming ${displayAmount} NIGHT for ${assetId} from ${originAddress} in Vault ${vaultName} to address ${destinationAddress}`
+          : `Claiming ${displayAmount} NIGHT for ${assetId} to address ${destinationAddress}`;
 
       const transactionPayload = await generateTransactionPayload(
         payload,
         chain,
         assetId,
         originVaultAccountId,
-        note
+        note,
+        this.fireblocksSDK
       );
 
       console.log("signMessage transactionPayload", transactionPayload);
