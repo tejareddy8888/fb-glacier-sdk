@@ -39,6 +39,17 @@ const startServer = () => {
     res.status(200).send("Alive");
   });
 
+  app.get("/metrics", (_req: Request, res: Response) => {
+    const metrics = fbNightApiService.getPoolMetrics();
+    res.status(200).json(metrics);
+  });
+
+  app.post("/clear-pool", (_req: Request, res: Response) => {
+    console.log("Clearing SDK pool...");
+    fbNightApiService.clearPool();
+    res.status(200).json({ message: "Pool cleared successfully" });
+  });
+
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
   app.get("/api-docs-json", (_req, res) => {
     res.setHeader("Content-Type", "application/json");

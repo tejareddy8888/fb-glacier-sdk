@@ -89,10 +89,12 @@ export class SdkManager {
    * @param vaultAccountId Vault account ID
    */
   public releaseSdk = (vaultAccountId: string): void => {
-    const poolItem = this.sdkPool.get(vaultAccountId);
-    if (poolItem) {
-      poolItem.isInUse = false;
-      poolItem.lastUsed = new Date();
+    // Release all SDK instances for this vault account (across all chains)
+    for (const [key, poolItem] of this.sdkPool.entries()) {
+      if (key.startsWith(`${vaultAccountId}:`)) {
+        poolItem.isInUse = false;
+        poolItem.lastUsed = new Date();
+      }
     }
   };
 
@@ -193,6 +195,28 @@ export class SdkManager {
     }
 
     return metrics;
+  };
+
+  /**
+   * Clear idle SDK instances from the pool
+   */
+  public clearIdleInstances = (): number => {
+    const keysToRemove: string[] = [];
+    let clearedCount = 0;
+
+    for (const [key, value] of this.sdkPool.entries()) {
+      if (!value.isInUse) {
+        keysToRemove.push(key);
+        clearedCount++;
+      }
+    }
+
+    for (const key of keysToRemove) {
+      this.sdkPool.delete(key);
+    }
+
+    console.log(`Cleared ${clearedCount} idle SDK instances from pool`);
+    return clearedCount;
   };
 
   /**

@@ -150,6 +150,13 @@ export class FbNightApiService {
   };
 
   /**
+   * Clear idle SDK instances from the pool
+   */
+  public clearPool = (): number => {
+    return this.sdkManager.clearIdleInstances();
+  };
+
+  /**
    * Shut down the API service and all SDK instances
    */
   public shutdown = async (): Promise<void> => {
