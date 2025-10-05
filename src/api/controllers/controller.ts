@@ -32,7 +32,6 @@ export class ApiController {
 
       res.status(200).json({ value: result });
     } catch (error: any) {
-      console.error("Error in checkAddressAllocation:", error.message);
       res.status(500).json({ error: error.message });
     }
   };
@@ -113,7 +112,7 @@ export class ApiController {
       const { txHash, senderAddress, tokenName } =
         (await this.api.executeTransaction({
           vaultAccountId,
-          chain: SupportedBlockchains.CARDANO_TESTNET,
+          chain: SupportedBlockchains.CARDANO,
           transactionType: TransactionType.TRANSFER_CLAIMS,
           params: {
             recipientAddress,
