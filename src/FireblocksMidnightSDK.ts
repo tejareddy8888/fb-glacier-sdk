@@ -36,7 +36,6 @@ export class FireblocksMidnightSDK {
   private address: string;
   private blockfrostProjectId?: string;
   private lucid?: lucid.Lucid;
-=====
 
   constructor(params: {
     fireblocksService: FireblocksService;
@@ -109,13 +108,13 @@ export class FireblocksMidnightSDK {
 
       // Only initialize Lucid if blockfrostProjectId is available
       if (blockfrostProjectId) {
-        const network = blockfrostUrl.includes("mainnet")
+        const network = blockfrostProjectId.includes("mainnet")
           ? "Mainnet"
-          : blockfrostUrl.includes("preprod")
+          : blockfrostProjectId.includes("preprod")
           ? "Preprod"
           : "Preview";
         sdkInstance.lucid = await lucid.Lucid.new(
-          new lucid.Blockfrost(blockfrostUrl, blockfrostProjectId),
+          new lucid.Blockfrost(blockfrostProjectId, blockfrostProjectId),
           network
         );
       }
@@ -297,13 +296,13 @@ export class FireblocksMidnightSDK {
 
       // Initialize Lucid if not already initialized
       if (!this.lucid) {
-        const network = blockfrostUrl.includes("mainnet")
+        const network = this.blockfrostProjectId.includes("mainnet")
           ? "Mainnet"
-          : blockfrostUrl.includes("preprod")
+          : this.blockfrostProjectId.includes("preprod")
           ? "Preprod"
           : "Preview";
         this.lucid = await lucid.Lucid.new(
-          new lucid.Blockfrost(blockfrostUrl, this.blockfrostProjectId),
+          new lucid.Blockfrost(this.blockfrostProjectId, this.blockfrostProjectId),
           network
         );
       }
