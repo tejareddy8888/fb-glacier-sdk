@@ -21,11 +21,7 @@ import {
   TransferClaimsResponse,
   trasnsferClaimsOpts,
 } from "./types.js";
-import {
-  blockfrostUrl,
-  nightTokenName,
-  tokenTransactionFee,
-} from "./constants.js";
+import { nightTokenName, tokenTransactionFee } from "./constants.js";
 import { getAssetIdsByBlockchain } from "./utils/general.js";
 import { calculateTtl, fetchAndSelectUtxos } from "./utils/cardano.utils.js";
 
@@ -40,6 +36,7 @@ export class FireblocksMidnightSDK {
   private address: string;
   private blockfrostProjectId?: string;
   private lucid?: lucid.Lucid;
+=====
 
   constructor(params: {
     fireblocksService: FireblocksService;
@@ -149,8 +146,9 @@ export class FireblocksMidnightSDK {
       );
     } catch (error: any) {
       throw new Error(
-        `Error in checkAddressAllocation:
-        ${error instanceof Error ? error.message : error}`
+        `Error in checkAddressAllocation: ${
+          error instanceof Error ? error.message : error
+        }`
       );
     }
   };
@@ -287,6 +285,9 @@ export class FireblocksMidnightSDK {
     minRecipientLovelace = 1_200_000,
     minChangeLovelace = 1_200_000,
   }: trasnsferClaimsOpts): Promise<TransferClaimsResponse> => {
+    if (!this.blockfrostProjectId) {
+      throw new Error("Blockfrost project id was not provided.");
+    }
     try {
       const transactionFee = BigInt(tokenTransactionFee);
 

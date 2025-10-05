@@ -121,7 +121,7 @@ export class ApiController {
       const { txHash, senderAddress, tokenName } =
         (await this.api.executeTransaction({
           vaultAccountId,
-          chain: SupportedBlockchains.CARDANO_TESTNET,
+          chain: SupportedBlockchains.CARDANO,
           transactionType: TransactionType.TRANSFER_CLAIMS,
           params: {
             recipientAddress,

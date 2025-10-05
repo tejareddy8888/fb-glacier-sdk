@@ -7,9 +7,6 @@ export const midnightClaimAddress = "https://mainnet.prod.gd.midnighttge.io"; //
 export const termsAndConditionsHash =
   "31a6bab50a84b8439adcfb786bb2020f6807e6e8fda629b424110fc7bb1c6b8b";
 
-export const blockfrostUrl = "https://cardano-preprod.blockfrost.io/api/v0/";
-
-// export const nightTokenName = "NIGHT";
-export const nightTokenName = "MIN";
+export const nightTokenName = "NIGHT";
 
 export const tokenTransactionFee = 200000;
