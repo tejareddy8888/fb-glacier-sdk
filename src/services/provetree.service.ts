@@ -1,4 +1,6 @@
-import { midnightProvtreeAdress } from "../constants.js";
+import axios from "axios";
+
+import { midnightProvtreeAddress } from "../constants.js";
 import { SupportedBlockchains } from "../types.js";
 import axiosInstance from "../utils/httpClient.js";
 
@@ -20,7 +22,11 @@ export class ProvetreeService {
   ): Promise<number> => {
     try {
       const response = await axiosInstance.get(
-        `${midnightProvtreeAdress}/check/${blockchainId}/${address}`,
+        `${
+          blockchainId === SupportedBlockchains.XRP
+            ? `${midnightProvtreeAddress}/check/ripple/${address}`
+            : `${midnightProvtreeAddress}/check/${blockchainId}/${address}`
+        }`,
         {
           headers: {
             Accept: "application/json;charset=utf-8",
@@ -48,7 +54,7 @@ export class ProvetreeService {
   ): Promise<any> => {
     try {
       const response = await axiosInstance.post(
-        midnightProvtreeAdress,
+        midnightProvtreeAddress,
         requestData,
         {
           headers: {
