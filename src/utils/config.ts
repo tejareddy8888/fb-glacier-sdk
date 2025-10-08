@@ -20,7 +20,7 @@ export const config: {
   FIREBLOCKS: {
     apiKey: process.env.FIREBLOCKS_API_KEY || "",
     secretKey: secretKey,
-    basePath: (process.env.BASE_PATH as BasePath) || BasePath.US,
+    basePath: (process.env.FIREBLOCKS_BASE_PATH as BasePath) || BasePath.EU,
   },
   BLOCKFROST_PROJECT_ID: process.env.BLOCKFROST_PROJECT_ID || "",
 };
