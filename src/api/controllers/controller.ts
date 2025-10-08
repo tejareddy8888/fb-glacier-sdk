@@ -179,4 +179,33 @@ export class ApiController {
       res.status(500).json({ error: error.message });
     }
   };
+
+  /**
+   * Get SDK pool metrics
+   */
+  public getPoolMetrics = async (req: Request, res: Response) => {
+    try {
+      const metrics = this.api.getPoolMetrics();
+      res.status(200).json(metrics);
+    } catch (error: any) {
+      console.error("[error] Error getting pool metrics:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
+
+  /**
+   * Clear idle SDK instances from pool
+   */
+  public clearPool = async (req: Request, res: Response) => {
+    try {
+      const clearedCount = this.api.clearPool();
+      res.status(200).json({ 
+        message: `Cleared ${clearedCount} idle instances from pool`,
+        clearedCount 
+      });
+    } catch (error: any) {
+      console.error("[error] Error clearing pool:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
 }

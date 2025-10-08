@@ -8,6 +8,41 @@ export const configureRouter = (api: FbNightApiService): Router => {
 
   /**
    * @openapi
+   * /health:
+   *   get:
+   *     summary: Health check endpoint
+   *     responses:
+   *       200:
+   *         description: Service is healthy
+   */
+  router.get("/health", (req, res) => {
+    res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+  });
+
+  /**
+   * @openapi
+   * /metrics:
+   *   get:
+   *     summary: Get SDK pool metrics
+   *     responses:
+   *       200:
+   *         description: Pool metrics
+   */
+  router.get("/metrics", apiController.getPoolMetrics);
+
+  /**
+   * @openapi
+   * /clear-pool:
+   *   post:
+   *     summary: Clear idle SDK instances from pool
+   *     responses:
+   *       200:
+   *         description: Pool cleared successfully
+   */
+  router.post("/clear-pool", apiController.clearPool);
+
+  /**
+   * @openapi
    * /api/check/{chain}/{vaultAccountId}:
    *   get:
    *     summary: Fetches address' allocation value by vault account and blockchain
