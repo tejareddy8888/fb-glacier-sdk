@@ -181,6 +181,99 @@ export class ApiController {
   };
 
   /**
+   * Fetches the redemption phase configuration from the Midnight claim API.
+   */
+  public getPhaseConfig = async (_req: Request, res: Response) => {
+    try {
+      const result = await this.api.executeTransaction({
+        vaultAccountId: "0",
+        chain: SupportedBlockchains.CARDANO,
+        transactionType: TransactionType.GET_PHASE_CONFIG,
+        params: {},
+      });
+      res.status(200).json({ result });
+    } catch (error: any) {
+      console.error("Error in getPhaseConfig:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
+
+  /**
+   * Returns the thaw schedule for the ADA address at `index` under the given
+   * Fireblocks vault account.
+   */
+  public getThawSchedule = async (req: Request, res: Response) => {
+    const { vaultAccountId } = req.params;
+    const index = req.query.index ? Number(req.query.index) : 0;
+    try {
+      const result = await this.api.executeTransaction({
+        vaultAccountId,
+        chain: SupportedBlockchains.CARDANO,
+        transactionType: TransactionType.GET_THAW_SCHEDULE,
+        params: { vaultAccountId, index },
+      });
+      res.status(200).json({ result });
+    } catch (error: any) {
+      console.error("Error in getThawSchedule:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
+
+  /**
+   * Returns the current status of a previously submitted thaw transaction.
+   */
+  public getThawStatus = async (req: Request, res: Response) => {
+    const { destAddress, transactionId } = req.params;
+    try {
+      const result = await this.api.executeTransaction({
+        vaultAccountId: "0",
+        chain: SupportedBlockchains.CARDANO,
+        transactionType: TransactionType.GET_THAW_STATUS,
+        params: { destAddress, transactionId },
+      });
+      res.status(200).json({ result });
+    } catch (error: any) {
+      console.error("Error in getThawStatus:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
+
+  /**
+   * Builds, signs (via Fireblocks), and submits a NIGHT redemption transaction
+   * for the ADA address at `index` under the given vault account. When
+   * `waitForConfirmation` is true the controller polls until the API reports
+   * confirmed/failed or times out.
+   */
+  public redeemNight = async (req: Request, res: Response) => {
+    const { vaultAccountId } = req.params;
+    const index = req.query.index ? Number(req.query.index) : 0;
+    const { waitForConfirmation, pollingIntervalMs, timeoutMs } = req.body ?? {};
+    try {
+      const result = await this.api.executeTransaction({
+        vaultAccountId,
+        chain: SupportedBlockchains.CARDANO,
+        transactionType: TransactionType.REDEEM_NIGHT,
+        params: {
+          vaultAccountId,
+          index,
+          waitForConfirmation,
+          pollingIntervalMs,
+          timeoutMs,
+        },
+      });
+      res.status(200).json({ result });
+    } catch (error: any) {
+      console.error(
+        "Error in redeemNight:",
+        error instanceof Error ? error.message : error
+      );
+      res
+        .status(500)
+        .json({ error: error instanceof Error ? error.message : error });
+    }
+  };
+
+  /**
    * Get SDK pool metrics
    */
   public getPoolMetrics = async (req: Request, res: Response) => {

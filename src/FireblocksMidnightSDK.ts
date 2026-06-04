@@ -9,15 +9,27 @@ import * as lucid from "lucid-cardano";
 import { FireblocksService } from "./services/fireblocks.service.js";
 import { ClaimApiService } from "./services/claim.api.service.js";
 import { ProvetreeService } from "./services/provetree.service.js";
+import { ThawsService } from "./services/thaws.service.js";
 import {
   checkAddressAllocationOpts,
   ClaimHistoryResponse,
   getClaimsHistoryOpts,
   getVaultAccountAddressesOpts,
   makeClaimsOpts,
+  PhaseConfigResponse,
+  redeemNightOpts,
   SubmitClaimResponse,
   SupportedAssetIds,
   SupportedBlockchains,
+  thawScheduleOpts,
+  thawStatusOpts,
+  ThawScheduleResponse,
+  ThawStatusSchedule,
+  ThawTransactionResponse,
+  ThawTransactionStatus,
+  TransactionBuildRequest,
+  TransactionBuildResponse,
+  TransactionSubmissionRequest,
   TransferClaimsResponse,
   trasnsferClaimsOpts,
 } from "./types.js";
@@ -31,6 +43,7 @@ export class FireblocksMidnightSDK {
   private fireblocksService: FireblocksService;
   private claimApiService: ClaimApiService;
   private provetreeService: ProvetreeService;
+  private thawsService: ThawsService;
   private assetId: SupportedAssetIds;
   private vaultAccountId: string;
   private address: string;
@@ -41,6 +54,7 @@ export class FireblocksMidnightSDK {
     fireblocksService: FireblocksService;
     claimApiService: ClaimApiService;
     provetreeService: ProvetreeService;
+    thawsService: ThawsService;
     assetId: SupportedAssetIds;
     vaultAccountId: string;
     address: string;
@@ -49,6 +63,7 @@ export class FireblocksMidnightSDK {
     this.fireblocksService = params.fireblocksService;
     this.claimApiService = params.claimApiService;
     this.provetreeService = params.provetreeService;
+    this.thawsService = params.thawsService;
     this.assetId = params.assetId;
     this.vaultAccountId = params.vaultAccountId;
     this.address = params.address;
@@ -95,11 +110,13 @@ export class FireblocksMidnightSDK {
 
       const claimApiService = new ClaimApiService();
       const provetreeService = new ProvetreeService();
+      const thawsService = new ThawsService();
 
       const sdkInstance = new FireblocksMidnightSDK({
         fireblocksService,
         claimApiService,
         provetreeService,
+        thawsService,
         assetId,
         vaultAccountId,
         address,
@@ -498,5 +515,356 @@ export class FireblocksMidnightSDK {
         ${error instanceof Error ? error.message : error}`
       );
     }
+  };
+
+  /**
+   * Returns the redemption phase configuration (window start, increments, etc.)
+   * from the Midnight claim service.
+   */
+  public getPhaseConfig = async (): Promise<PhaseConfigResponse> => {
+    try {
+      return await this.thawsService.getPhaseConfig();
+    } catch (error: any) {
+      throw new Error(
+        `Error in getPhaseConfig: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  };
+
+  /**
+   * Returns the thaw schedule for the Cardano address at the given vault
+   * account / address index pair.
+   */
+  public getThawSchedule = async ({
+    vaultAccountId,
+    index,
+  }: thawScheduleOpts): Promise<ThawScheduleResponse> => {
+    try {
+      const destAddress = await this.resolveAdaAddressAtIndex(
+        vaultAccountId,
+        index
+      );
+      return await this.thawsService.getThawSchedule(destAddress);
+    } catch (error: any) {
+      throw new Error(
+        `Error in getThawSchedule: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  };
+
+  /**
+   * Returns the status of an already-submitted thaw transaction.
+   */
+  public getThawTransactionStatus = async ({
+    destAddress,
+    transactionId,
+  }: thawStatusOpts): Promise<ThawTransactionStatus> => {
+    try {
+      return await this.thawsService.getTransactionStatus(
+        destAddress,
+        transactionId
+      );
+    } catch (error: any) {
+      throw new Error(
+        `Error in getThawTransactionStatus: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  };
+
+  /**
+   * Executes the full redeem flow for a vault address: validates the
+   * redemption window, picks funding/collateral UTXOs, builds an unsigned
+   * thaw transaction via the Midnight API, signs the transaction hash with
+   * Fireblocks, and submits the witness back to the API. Optionally polls
+   * the API for confirmation.
+   */
+  public redeemNight = async (
+    params: redeemNightOpts
+  ): Promise<ThawTransactionResponse & { finalStatus?: string }> => {
+    try {
+      const {
+        vaultAccountId,
+        index,
+        waitForConfirmation,
+        pollingIntervalMs,
+        timeoutMs,
+      } = params;
+
+      if (!this.blockfrostProjectId) {
+        throw new Error("Blockfrost project ID is required for redemption");
+      }
+      await this.ensureLucid();
+
+      const destAddress = await this.resolveAdaAddressAtIndex(
+        vaultAccountId,
+        index
+      );
+      console.log(`Using address at index ${index}: ${destAddress}`);
+
+      await this.validateRedemptionWindow();
+
+      const schedule = await this.thawsService.getThawSchedule(destAddress);
+      const redeemableThaws = schedule.thaws.filter(
+        (t) => t.status === ThawStatusSchedule.REDEEMABLE
+      );
+      if (redeemableThaws.length === 0) {
+        throw new Error(
+          `No redeemable thaws available for address: ${destAddress}`
+        );
+      }
+      console.log(
+        `Found ${redeemableThaws.length} redeemable thaw(s) for ${destAddress}`
+      );
+
+      const fundingUtxoHex = await this.fetchFundingUtxoHex(destAddress);
+      const collateralUtxos = await this.fetchCollateralUtxoHexList(destAddress);
+
+      const buildRequest: TransactionBuildRequest = {
+        change_address: destAddress,
+        funding_utxos: [fundingUtxoHex],
+        collateral_utxos: collateralUtxos,
+      };
+      const txBuildResponse = await this.thawsService.buildThawTransaction(
+        destAddress,
+        buildRequest
+      );
+
+      if (txBuildResponse.require_thawing_extra_signature) {
+        throw new Error(
+          "Additional thawing signature required but not implemented."
+        );
+      }
+      console.log(
+        `Built thaw transaction ${txBuildResponse.transaction_id}, redeems ${txBuildResponse.redeemed_amount} NIGHT`
+      );
+
+      const witnessSetHex = await this.signRedemptionTransaction(
+        vaultAccountId,
+        txBuildResponse.transaction_id,
+        index
+      );
+
+      const submitRequest: TransactionSubmissionRequest = {
+        transaction: txBuildResponse.transaction,
+        transaction_witness_set: witnessSetHex,
+      };
+      const submitResponse = await this.thawsService.submitThawTransaction(
+        destAddress,
+        submitRequest
+      );
+      console.log(
+        `Submitted thaw transaction ${submitResponse.transaction_id}, eta ${submitResponse.estimated_submission_time}`
+      );
+
+      if (waitForConfirmation) {
+        const finalStatus = await this.waitForConfirmation(
+          destAddress,
+          submitResponse.transaction_id,
+          timeoutMs ?? 300_000,
+          pollingIntervalMs ?? 15_000
+        );
+        return { ...submitResponse, finalStatus };
+      }
+
+      return submitResponse;
+    } catch (error: any) {
+      throw new Error(
+        `Error in redeemNight: ${error instanceof Error ? error.message : JSON.stringify(error)}`
+      );
+    }
+  };
+
+  private ensureLucid = async (): Promise<lucid.Lucid> => {
+    if (this.lucid) return this.lucid;
+    if (!this.blockfrostProjectId) {
+      throw new Error("Blockfrost project ID is required");
+    }
+    const network = this.blockfrostProjectId.includes("mainnet")
+      ? "Mainnet"
+      : this.blockfrostProjectId.includes("preprod")
+        ? "Preprod"
+        : "Preview";
+    this.lucid = await lucid.Lucid.new(
+      new lucid.Blockfrost(this.blockfrostProjectId, this.blockfrostProjectId),
+      network
+    );
+    return this.lucid;
+  };
+
+  private resolveAdaAddressAtIndex = async (
+    vaultAccountId: string,
+    index: number
+  ): Promise<string> => {
+    const adaAssetId =
+      this.assetId === SupportedAssetIds.ADA_TEST
+        ? SupportedAssetIds.ADA_TEST
+        : SupportedAssetIds.ADA;
+    const addresses = await this.fireblocksService.getVaultAccountAddresses(
+      vaultAccountId,
+      adaAssetId
+    );
+    const match = addresses.find((a) => a.bip44AddressIndex === index);
+    if (!match || !match.address) {
+      throw new Error(
+        `No ADA address at index ${index} for vault ${vaultAccountId}`
+      );
+    }
+    return match.address;
+  };
+
+  private validateRedemptionWindow = async (): Promise<void> => {
+    const config = await this.thawsService.getPhaseConfig();
+    const windowInfo = this.thawsService.getRedemptionWindowTimes(config);
+    if (!windowInfo.isOpen) {
+      throw new Error(
+        `Redemption window is not open. Window: ${windowInfo.startTime.toISOString()} - ${windowInfo.endTime.toISOString()}`
+      );
+    }
+  };
+
+  private fetchFundingUtxoHex = async (
+    destAddress: string
+  ): Promise<string> => {
+    const l = await this.ensureLucid();
+    const utxos = await l.utxosAt(destAddress);
+    if (!utxos || utxos.length === 0) {
+      throw new Error(`No UTXOs found for address: ${destAddress}`);
+    }
+
+    const COLLATERAL_EXACT = 5_000_000n;
+    const fundingCandidates = utxos.filter((u) => {
+      const lovelaceOnly =
+        Object.keys(u.assets).length === 1 && u.assets.lovelace !== undefined;
+      const isExactCollateral =
+        lovelaceOnly && u.assets.lovelace === COLLATERAL_EXACT;
+      return !isExactCollateral;
+    });
+
+    const pool = fundingCandidates.length > 0 ? fundingCandidates : utxos;
+    const largest = pool
+      .slice()
+      .sort((a, b) =>
+        Number((b.assets.lovelace ?? 0n) - (a.assets.lovelace ?? 0n))
+      )[0];
+    return this.utxoToHex(largest, destAddress);
+  };
+
+  private fetchCollateralUtxoHexList = async (
+    destAddress: string
+  ): Promise<string[]> => {
+    const l = await this.ensureLucid();
+    const utxos = await l.utxosAt(destAddress);
+    if (!utxos || utxos.length === 0) return [];
+
+    const MIN_COLLATERAL_LOVELACE = 5_000_000n;
+    const candidates = utxos.filter((u) => {
+      const lovelaceOnly =
+        Object.keys(u.assets).length === 1 && u.assets.lovelace !== undefined;
+      const enough = (u.assets.lovelace ?? 0n) >= MIN_COLLATERAL_LOVELACE;
+      return lovelaceOnly && enough;
+    });
+    return candidates.slice(0, 3).map((u) => this.utxoToHex(u, destAddress));
+  };
+
+  private utxoToHex = (utxo: lucid.UTxO, destAddress: string): string => {
+    const txHash = lucid.C.TransactionHash.from_hex(utxo.txHash);
+    const txIn = lucid.C.TransactionInput.new(
+      txHash,
+      lucid.C.BigNum.from_str(utxo.outputIndex.toString())
+    );
+    const address = lucid.C.Address.from_bech32(destAddress);
+    const lovelace = utxo.assets.lovelace ?? 0n;
+    const amount = lucid.C.Value.new(
+      lucid.C.BigNum.from_str(lovelace.toString())
+    );
+    const txOut = lucid.C.TransactionOutput.new(address, amount);
+    const unspent = lucid.C.TransactionUnspentOutput.new(txIn, txOut);
+    return Buffer.from(unspent.to_bytes()).toString("hex");
+  };
+
+  private signRedemptionTransaction = async (
+    vaultAccountId: string,
+    transactionId: string,
+    addressIndex: number
+  ): Promise<string> => {
+    const transactionPayload = {
+      assetId: SupportedAssetIds.ADA,
+      operation: TransactionOperation.Raw,
+      source: {
+        type: TransferPeerPathType.VaultAccount,
+        id: vaultAccountId,
+      },
+      note: `Redeem NIGHT tokens from vault account ${vaultAccountId} address index ${addressIndex}`,
+      extraParameters: {
+        rawMessageData: {
+          messages: [
+            {
+              content: transactionId,
+              bip44addressIndex: addressIndex,
+            },
+          ],
+        },
+      },
+    };
+
+    const fbResponse = await this.fireblocksService.broadcastTransaction(
+      transactionPayload
+    );
+    if (!fbResponse?.signature?.fullSig) {
+      throw new Error("Missing signature from Fireblocks");
+    }
+    if (!fbResponse.publicKey) {
+      throw new Error("Missing public key from Fireblocks");
+    }
+
+    const publicKeyBytes = Buffer.from(fbResponse.publicKey, "hex");
+    const signatureBytes = Buffer.from(fbResponse.signature.fullSig, "hex");
+    const publicKey = lucid.C.PublicKey.from_bytes(publicKeyBytes);
+    const vkey = lucid.C.Vkey.new(publicKey);
+    const signature = lucid.C.Ed25519Signature.from_bytes(signatureBytes);
+    const vkeyWitness = lucid.C.Vkeywitness.new(vkey, signature);
+    const vkeyWitnesses = lucid.C.Vkeywitnesses.new();
+    vkeyWitnesses.add(vkeyWitness);
+    const witnessSet = lucid.C.TransactionWitnessSet.new();
+    witnessSet.set_vkeys(vkeyWitnesses);
+    return Buffer.from(witnessSet.to_bytes()).toString("hex");
+  };
+
+  private waitForConfirmation = async (
+    destAddress: string,
+    transactionId: string,
+    timeoutMs: number,
+    intervalMs: number
+  ): Promise<string> => {
+    const start = Date.now();
+    let lastStatus: string = "unknown";
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const status = await this.thawsService.getTransactionStatus(
+          destAddress,
+          transactionId
+        );
+        lastStatus = status.status;
+        console.log(
+          `Transaction ${transactionId} status: ${status.status} (${status.redeemed_amount} NIGHT)`
+        );
+        if (status.status === ThawStatusSchedule.CONFIRMED) {
+          return status.status;
+        }
+        if (status.status === ThawStatusSchedule.FAILED) {
+          throw new Error(
+            `Transaction ${transactionId} failed during confirmation`
+          );
+        }
+      } catch (error: any) {
+        console.warn(
+          `Error checking status (will retry): ${error.message ?? error}`
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    throw new Error(
+      `Transaction confirmation timeout after ${timeoutMs}ms. Last status: ${lastStatus}`
+    );
   };
 }
