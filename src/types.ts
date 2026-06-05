@@ -28,6 +28,21 @@ export enum TransactionType {
   MAKE_CLAIMS = "makeClaims",
   TRANSFER_CLAIMS = "transferClaims",
   GET_VAULT_ACCOUNT_ADDRESSES = "getVaultAccountAddresses",
+  GET_PHASE_CONFIG = "getPhaseConfig",
+  GET_THAW_SCHEDULE = "getThawSchedule",
+  GET_THAW_STATUS = "getThawStatus",
+  REDEEM_NIGHT = "redeemNight",
+}
+
+export enum ThawStatusSchedule {
+  UPCOMING = "upcoming",
+  QUEUED = "queued",
+  REDEEMABLE = "redeemable",
+  SUBMITTED = "submitted",
+  FAILED = "failed",
+  CONFIRMING = "confirming",
+  CONFIRMED = "confirmed",
+  SKIPPED = "skipped",
 }
 
 export interface checkAddressAllocationOpts {
@@ -55,6 +70,74 @@ export interface getVaultAccountAddressesOpts {
   vaultAccountId: string;
 }
 
+export interface thawScheduleOpts {
+  vaultAccountId: string;
+  index: number;
+}
+
+export interface thawStatusOpts {
+  destAddress: string;
+  transactionId: string;
+}
+
+export interface redeemNightOpts {
+  vaultAccountId: string;
+  index: number;
+  waitForConfirmation?: boolean;
+  pollingIntervalMs?: number;
+  timeoutMs?: number;
+}
+
+export interface PhaseConfigResponse {
+  genesis_timestamp: number;
+  jitter_strata_count: number;
+  redemption_increment_period: number;
+  redemption_increments: number;
+  redemption_initial_delay: number;
+}
+
+export interface Thaw {
+  amount: number;
+  queue_position?: number;
+  status: ThawStatusSchedule;
+  thawing_period_start: string;
+  transaction_id?: string;
+}
+
+export interface ThawScheduleResponse {
+  number_of_claimed_allocations: number;
+  thaws: Thaw[];
+}
+
+export interface TransactionBuildRequest {
+  change_address: string;
+  collateral_utxos: string[];
+  funding_utxos: string[];
+}
+
+export interface TransactionBuildResponse {
+  redeemed_amount: number;
+  require_thawing_extra_signature: boolean;
+  transaction: string;
+  transaction_id: string;
+}
+
+export interface TransactionSubmissionRequest {
+  transaction: string;
+  transaction_witness_set: string;
+}
+
+export interface ThawTransactionResponse {
+  estimated_submission_time: number;
+  transaction_id: string;
+}
+
+export interface ThawTransactionStatus {
+  redeemed_amount: number;
+  status: ThawStatusSchedule;
+  transaction_id: string;
+}
+
 export interface ExecuteTransactionOpts {
   vaultAccountId: string;
   chain: SupportedBlockchains;
@@ -64,7 +147,11 @@ export interface ExecuteTransactionOpts {
     | getClaimsHistoryOpts
     | makeClaimsOpts
     | trasnsferClaimsOpts
-    | getVaultAccountAddressesOpts;
+    | getVaultAccountAddressesOpts
+    | thawScheduleOpts
+    | thawStatusOpts
+    | redeemNightOpts
+    | Record<string, never>;
 }
 
 export interface SdkManagerMetrics {

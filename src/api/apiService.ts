@@ -12,8 +12,15 @@ import {
   getClaimsHistoryOpts,
   getVaultAccountAddressesOpts,
   makeClaimsOpts,
+  PhaseConfigResponse,
+  redeemNightOpts,
   SdkManagerMetrics,
   SubmitClaimResponse,
+  thawScheduleOpts,
+  thawStatusOpts,
+  ThawScheduleResponse,
+  ThawTransactionResponse,
+  ThawTransactionStatus,
   TransactionType,
   TransferClaimsResponse,
   trasnsferClaimsOpts,
@@ -81,6 +88,10 @@ export class FbNightApiService {
     | ClaimHistoryResponse[]
     | SubmitClaimResponse[]
     | VaultWalletAddress[]
+    | PhaseConfigResponse
+    | ThawScheduleResponse
+    | ThawTransactionStatus
+    | (ThawTransactionResponse & { finalStatus?: string })
   > => {
     let sdk: FireblocksMidnightSDK | undefined;
     try {
@@ -94,7 +105,11 @@ export class FbNightApiService {
         | TransferClaimsResponse
         | ClaimHistoryResponse[]
         | SubmitClaimResponse[]
-        | VaultWalletAddress[];
+        | VaultWalletAddress[]
+        | PhaseConfigResponse
+        | ThawScheduleResponse
+        | ThawTransactionStatus
+        | (ThawTransactionResponse & { finalStatus?: string });
       switch (transactionType) {
         case TransactionType.CHECK_ADDRESS_ALLOCATION:
           result = await sdk.checkAddressAllocation(
@@ -118,6 +133,24 @@ export class FbNightApiService {
           result = await sdk.getVaultAccountAddresses(
             params as getVaultAccountAddressesOpts
           );
+          break;
+
+        case TransactionType.GET_PHASE_CONFIG:
+          result = await sdk.getPhaseConfig();
+          break;
+
+        case TransactionType.GET_THAW_SCHEDULE:
+          result = await sdk.getThawSchedule(params as thawScheduleOpts);
+          break;
+
+        case TransactionType.GET_THAW_STATUS:
+          result = await sdk.getThawTransactionStatus(
+            params as thawStatusOpts
+          );
+          break;
+
+        case TransactionType.REDEEM_NIGHT:
+          result = await sdk.redeemNight(params as redeemNightOpts);
           break;
 
         default:

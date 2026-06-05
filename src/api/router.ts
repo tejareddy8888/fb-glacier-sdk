@@ -170,5 +170,111 @@ export const configureRouter = (api: FbNightApiService): Router => {
    */
   router.post("/claims/:chain", apiController.makeClaims);
 
+  /**
+   * @openapi
+   * /api/thaws/phase-config:
+   *   get:
+   *     summary: Get redemption phase configuration
+   *     tags:
+   *       - Thaws/Redemption
+   *     responses:
+   *       200:
+   *         description: Phase configuration retrieved
+   */
+  router.get("/thaws/phase-config", apiController.getPhaseConfig);
+
+  /**
+   * @openapi
+   * /api/thaws/thaw-schedule/{vaultAccountId}:
+   *   get:
+   *     summary: Get thaw schedule for a vault account address
+   *     tags:
+   *       - Thaws/Redemption
+   *     parameters:
+   *       - in: path
+   *         name: vaultAccountId
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: query
+   *         name: index
+   *         required: false
+   *         schema:
+   *           type: number
+   *           default: 0
+   *     responses:
+   *       200:
+   *         description: Thaw schedule retrieved
+   */
+  router.get(
+    "/thaws/thaw-schedule/:vaultAccountId",
+    apiController.getThawSchedule
+  );
+
+  /**
+   * @openapi
+   * /api/thaws/status/{destAddress}/{transactionId}:
+   *   get:
+   *     summary: Get the status of a thaw transaction
+   *     tags:
+   *       - Thaws/Redemption
+   *     parameters:
+   *       - in: path
+   *         name: destAddress
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: transactionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Transaction status retrieved
+   */
+  router.get(
+    "/thaws/status/:destAddress/:transactionId",
+    apiController.getThawStatus
+  );
+
+  /**
+   * @openapi
+   * /api/thaws/redeem/{vaultAccountId}:
+   *   post:
+   *     summary: Redeem NIGHT tokens during the redemption window
+   *     tags:
+   *       - Thaws/Redemption
+   *     parameters:
+   *       - in: path
+   *         name: vaultAccountId
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: query
+   *         name: index
+   *         required: false
+   *         schema:
+   *           type: number
+   *           default: 0
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               waitForConfirmation:
+   *                 type: boolean
+   *               pollingIntervalMs:
+   *                 type: number
+   *               timeoutMs:
+   *                 type: number
+   *     responses:
+   *       200:
+   *         description: Redemption transaction submitted
+   */
+  router.post("/thaws/redeem/:vaultAccountId", apiController.redeemNight);
+
   return router;
 };
